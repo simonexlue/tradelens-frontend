@@ -142,6 +142,19 @@ tradelens-frontend/
 
 ---
 
+## 🎨 Branding
+Palette
+Element	Hex	Tailwind reference	Typical usage
+Primary (Navy)	#1A237E	text-[#1A237E], bg-[#1A237E]	Headings, nav, brand accents
+Accent (Teal)	#18B6B2	text-teal-400, hover:bg-teal-500, border-teal-500	Primary buttons, links, focus/hover states
+Neutral Light	#E5E7EB	text-slate-200 / text-slate-300	Light text on dark backgrounds, subtle labels
+Neutral Dark (Text)	#334155	text-slate-700 / text-slate-800	Body text on light backgrounds
+Dark Surfaces	#0F172A–#111827 range	bg-slate-900, border-slate-700	App background, input fields, cards
+Success	#10B981	text-emerald-400	Positive states (e.g., “Account created!”)
+Error	#EF4444	text-rose-400	Errors/validation (e.g., auth failures)
+
+---
+
 ## 📚 Notes for Future Development
 This README is intentionally **modular and updatable**.  
 When new features or phases are added, append sections under:
@@ -153,7 +166,7 @@ When new features or phases are added, append sections under:
 
 **Maintainer:** Simone Lue  
 **Last Updated:** October 2025  
-**Status:** Phase 1 — Frontend setup  
+**Status:** Phase 2 
 
 ## License
 
