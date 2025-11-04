@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { fetchTrade, imgUrl, type Trade } from "@/lib/tradesApi";
+import { fetchTrade, imgUrl, updateTradeNote, type Trade } from "@/lib/tradesApi";
 import { Pencil, Check, X} from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -65,20 +65,12 @@ function TradeDetailPage() {
         if (!tradeId) return;
         try {
             setSaving(true);
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/trades/${tradeId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ note: editedNote }),
-            });
-
-            if (!res.ok) throw new Error("Failed to update note");
-
-            const updated = await res.json();
+            const updated = await updateTradeNote(tradeId, editedNote);
             setTrade(updated);
             setIsEditing(false);
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("Error saving note");
+            alert(e?.message || "Error saving note");
         } finally {
             setSaving(false);
         }

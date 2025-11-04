@@ -10,6 +10,10 @@ const nextConfig = {
       { pathname: '/api/images/**' },
     ],
   },
+      remotePatterns: [
+      { protocol: 'https', hostname: '*.s3.amazonaws.com' },
+      { protocol: 'https', hostname: '*.s3.*.amazonaws.com' }, // regional style
+    ],
 };
 
 export default nextConfig;

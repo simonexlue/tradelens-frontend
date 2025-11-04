@@ -74,3 +74,30 @@ export function imgUrl(key: string, opts?: { fit?: "thumb" | "raw"; w?: number }
   if (opts?.w) return `${base}?w=${opts.w}`;
   return base;
 }
+
+export async function updateTradeNote(id: string, note: string) {
+  if (!API_BASE) throw new Error("API base not configured (NEXT_PUBLIC_API_BASE).");
+
+  const res = await fetch(`${API_BASE}/trades/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "x-user-id": DEV_USER_ID,
+    },
+    body: JSON.stringify({ note }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j.detail || j.error || JSON.stringify(j);
+    } catch {
+      detail = await res.text().catch(() => "");
+    }
+    throw new Error(`Failed to update note (${res.status}) ${detail}`.trim());
+  }
+
+  return (await res.json()) as Trade;
+}
