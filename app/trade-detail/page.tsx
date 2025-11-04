@@ -1,5 +1,191 @@
-export default function TradeDetails() {
+"use client"
+
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { fetchTrade, imgUrl, type Trade } from "@/lib/tradesApi";
+
+export default function TradeDetailPage() {
+
+    const router = useRouter();
+    const search = useSearchParams();
+    const tradeId = search.get("id");
+
+    const [trade, setTrade] = useState<Trade | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    // Lightbox
+    const [isOpen, setIsOpen] = useState(false);
+    const [index, setIndex] = useState(0);
+
+    const images = useMemo(() => trade?.images ?? [], [trade]);
+
+    useEffect(() => {
+        if(!tradeId) {
+            setError("Missing trade id in query (?id=...)");
+            return;
+        }
+        (async ()=> {
+            try {
+                setLoading(true);
+                const data = await fetchTrade(tradeId);
+                setTrade(data);
+            } catch (e: any) {
+                setError(e?.message ?? "Failed to load trade");
+            } finally {
+                setLoading(false);
+            }
+        }) ();
+    }, [tradeId]); 
+
+    const open = (i: number) => {setIndex(i); setIsOpen(true); };
+    const close = () => setIsOpen(false);
+    const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
+    const next = () => setIndex((i) => (i + 1) % images.length);
+
     return (
-        ""
+        <div className="mx-4 md:mx-8 xl:mx-20 py-6">
+            {/* Header */}
+            <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => router.back()}
+                        className="rounded-2xl border border-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
+                    >
+                        ← Back
+                    </button>
+                    <h1 className="text-2xl font-semibold text-slate-100">
+                        Trade Details
+                    </h1>
+                </div>
+
+                <Button 
+                    onClick={() => router.push("/trades-new")}
+                    className="bg-[#18B6B2] hover-bg-[#10a3a0] text-slate-900"
+                >
+                    Upload another image
+                </Button>
+            </div>
+
+            {/* Error / Loading */}
+            {error && (
+                <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-red-300">
+                    {error}
+                </div>
+            )}
+            {loading && (
+                <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-slate-300">
+                Loading…
+                </div>
+            )}
+
+            {/* Content */}
+            {trade && !loading && (
+                <div className="space-y-8">
+                    {/* Note */}
+                    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                        <h2 className="mb-2 text-lg font-medium text-slate-100">Note</h2>
+                        <p className="text-slate-300">{trade.note?.trim() || "(no notes)"}</p>
+                    </section>
+
+                    {/* Images */}
+                    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                        <div className="mb-3 flex items-center justify-between">
+                            <h2 className="text-lg font-medium text-slate-100">Images</h2>
+                            <span className="text-xs text-slate-400">
+                                {images.length} {images.length === 1 ? "image" : "images"}
+                            </span>
+                        </div>
+
+                        {images.length === 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                No images yet. Use "Upload another image" to add screenshots
+                            </div>
+                        ): (
+                            <div>
+                                {images.map((img, i) => (
+                                    <button
+                                        key={img.id ?? img.s3_key}
+                                        onClick={() => open(i)}
+                                        className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/40"
+                                    >
+                                        <img 
+                                            src={imgUrl(img.s3_key, {fit:"thumb"})}
+                                            alt={`Screenshot ${i + 1}`}
+                                            loading="lazy"
+                                            className="w-full transition-transform group-hover:scale-[1.02]"
+                                        />
+                                        <div className="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-teal-500/0 group-hover:ring-2 group-hover:ring-teal-500/40"/>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Analysis*/}
+                    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                        <h2 className="mb-2 text-lg font-medium text-slate-100">Analysis</h2>
+                        <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-slate-400">
+                            No analysis yet. Waiting for AI integration.
+                            <ul className="mt-2 list-disc pl-5">
+                                <li>What happened</li>
+                                <li>Why it worked / failed</li>
+                                <li>2-3 tips to improve</li>
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+            )}
+
+            {/* Lightbox */}
+            {isOpen && images.length > 0 && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+                    onClick={close}
+                >
+                    <div 
+                        className="relative mx-4 w-full max-w-5xl"
+                        onClick={(e) => e.stopPropagation()}
+                        >
+                        <img 
+                            src={imgUrl(images[index].s3_key, {w:1920})}
+                            alt={`Screenshot ${index + 1}`}
+                            className="max-h-[85vh] w-full object-contain"
+                        />
+                        <button
+                            onClick={close}
+                            className="absolute right-2 top-2 rounded-full bg-slate-900/70 px-3 py-1 text-slate-200 hover:bg-slate-900"
+                            aria-label="Close"
+                        >
+                            x
+                        </button>
+
+                        {images.length > 1 && (
+                            <>
+                                <button 
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-slate-200 hover:bg-slate-900"
+                                    aria-label="Previous"
+                                    onClick={prev}
+                                >
+                                    ‹
+                                </button>
+
+                                <button
+                                    onClick={next}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-slate-200 hover:bg-slate-900"
+                                    aria-label="Next"
+                                >
+                                    ›
+                                </button>
+                                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-xs text-slate-200">
+                                    {index + 1} / { images.length}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     )
 }

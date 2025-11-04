@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TradeCard from "@/components/TradeCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button"
+import { fetchTrades } from "@/lib/tradesApi";
 
 type TradeListItem = {
     id: string;
@@ -13,40 +14,6 @@ type TradeListItem = {
     image_count?: number;
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/+$/, ""); // strip trailing /
-const DEV_USER_ID = process.env.NEXT_PUBLIC_DEV_USER_ID!;
-
-async function fetchTrades(opts: { limit?: number; cursor?: string | null }) {
-  const params = new URLSearchParams();
-  if (opts.limit) params.set("limit", String(opts.limit));
-  if (opts.cursor) params.set("cursor", opts.cursor);   // don't send cursor= when empty
-
-  // IMPORTANT: no double slashes, and try NO trailing slash on the resource
-  const url = `${API_BASE}/trades${params.toString() ? `?${params.toString()}` : ""}`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "accept": "application/json",
-      "x-user-id": DEV_USER_ID, // triggers preflight
-    },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const j = await res.json();
-      detail = j.detail || j.error || JSON.stringify(j);
-    } catch {
-      detail = await res.text().catch(() => "");
-    }
-    throw new Error(`Failed to fetch trades (${res.status}) ${detail}`.trim());
-  }
-
-  return (await res.json()) as { items: TradeListItem[]; nextCursor: string | null };
-}
-
 export default function TradeListPage() {
     const [items, setItems] = useState<TradeListItem[]>([]);
     const [cursor, setCursor] = useState<string | null>(null);
@@ -54,20 +21,19 @@ export default function TradeListPage() {
     const [error, setError] = useState<string |null>(null);
 
   useEffect(() => {
-    // basic env guard like /trades-new
-    if (!API_BASE || !DEV_USER_ID) {
-      setError("Missing NEXT_PUBLIC_API_BASE or NEXT_PUBLIC_DEV_USER_ID");
-      return;
-    }
-    void loadMore();
+    void loadMore(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadMore() {
+  async function loadMore(initial = false) {
     try {
       setLoading(true);
       setError(null);
-      const { items: newItems, nextCursor } = await fetchTrades({ limit: 12, cursor });
-      setItems((prev) => [...prev, ...newItems]);
+      const { items: newItems, nextCursor } = await fetchTrades({
+        limit: 12,
+        cursor: initial ? null : cursor,
+      });
+      setItems((prev) => (initial ? newItems : [...prev, ...newItems]));
       setCursor(nextCursor);
     } catch (e: any) {
       setError(e?.message ?? "Failed loading trades");
@@ -75,6 +41,7 @@ export default function TradeListPage() {
       setLoading(false);
     }
   }
+
     return (
         <div className="mx-4 md:mx-8 xl:mx-20 py-6">
 
