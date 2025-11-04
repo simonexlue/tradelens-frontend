@@ -68,11 +68,13 @@ export async function fetchTrade(id: string) {
   return (await res.json()) as Trade;
 }
 
-export function imgUrl(key: string, opts?: { fit?: "thumb" | "raw"; w?: number }) {
-  const base = `/api/images/${encodeURIComponent(key)}`;
-  if (opts?.fit === "thumb") return `${base}?fit=thumb`;
-  if (opts?.w) return `${base}?w=${opts.w}`;
-  return base;
+export function imgUrl(s3Key: string, q?: Record<string, string | number>) {
+  const qs = q
+    ? "?" + new URLSearchParams(
+        Object.entries(q).map(([k, v]) => [k, String(v)])
+      ).toString()
+    : "";
+  return `/api/images/${s3Key}${qs}`;
 }
 
 export async function updateTradeNote(id: string, note: string) {
