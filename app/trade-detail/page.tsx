@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { fetchTrade, imgUrl, type Trade } from "@/lib/tradesApi";
@@ -8,7 +8,20 @@ import { fetchTrade, imgUrl, type Trade } from "@/lib/tradesApi";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export default function TradeDetailPage() {
+function Fallback() {
+  return (
+    <div className="mx-4 md:mx-8 xl:mx-20 py-6">
+      <div className="mb-6 h-8 w-48 animate-pulse rounded bg-slate-800" />
+      <div className="space-y-4">
+        <div className="h-40 animate-pulse rounded-2xl bg-slate-800" />
+        <div className="h-40 animate-pulse rounded-2xl bg-slate-800" />
+        <div className="h-40 animate-pulse rounded-2xl bg-slate-800" />
+      </div>
+    </div>
+  );
+}
+
+function TradeDetailPage() {
 
     const router = useRouter();
     const search = useSearchParams();
@@ -191,4 +204,12 @@ export default function TradeDetailPage() {
             )}
         </div>
     )
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<Fallback />}>
+      <TradeDetailPage />
+    </Suspense>
+  );
 }
