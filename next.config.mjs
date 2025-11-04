@@ -1,21 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // experimental: {
-  //   appDir: true,
-  // },
-
   images: {
-    // Allow local API image endpoints that use search params
     localPatterns: [
-      {
-        // your route handler or rewrite path
-        pathname: '/api/images/:path*',
-        search: 'fit=**',
-      },
-      { pathname: '/api/images/:path*' }, 
+      // exactly /api/images/... with ?fit=thumb
+      // { pathname: '/api/images/:path*', search: 'fit=thumb' },
+
+      // (optional) also allow the same path with NO query string
+      { pathname: '/api/images/**' },
     ],
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

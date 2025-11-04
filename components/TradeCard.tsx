@@ -36,7 +36,7 @@ export default function TradeCard({
       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 transition-colors group-hover:border-teal-500/40">
         {/* Thumbnail */}
         <div className="relative aspect-[4/3] w-full overflow-hidden">
-          {/* {imgSrc ? (
+          {imgSrc ? (
             <Image
               src={imgSrc!}
               alt="Trade screenshot"
@@ -49,7 +49,7 @@ export default function TradeCard({
             <div className="flex h-full w-full items-center justify-center bg-slate-800 text-slate-400">
               No image
             </div>
-          )} */}
+          )}
           {typeof image_count === "number" && (
             <div className="absolute right-2 top-2 rounded-full border border-slate-700 bg-slate-950/70 px-2 py-0.5 text-xs text-slate-200 backdrop-blur">
               {image_count} {image_count === 1 ? "img" : "imgs"}

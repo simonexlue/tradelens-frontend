@@ -93,22 +93,22 @@ export default function TradeListPage() {
                 </div>
             )}
 
-            <ul>
-                {items.map((t) => {
-                    const firstKey = t.images?.[0]?.s3_key ?? null;
-                    return (
-                        <li key={t.id}>
-                            <TradeCard 
-                                id={t.id}
-                                note={t.note}
-                                created_at={t.created_at}
-                                thumbnail_s3_key={firstKey}
-                                image_count={t.image_count}
-                            />
-                        </li>
-                    )
-                })}
-            </ul>
+            {/* Grid of Trade Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-6">
+            {items.map((t) => {
+                const firstKey = t.images?.[0]?.s3_key ?? null;
+                return (
+                <TradeCard
+                    key={t.id}
+                    id={t.id}
+                    note={t.note}
+                    created_at={t.created_at}
+                    thumbnail_s3_key={firstKey}
+                    image_count={t.image_count}
+                />
+                );
+            })}
+            </div>
         </div>
     )
 }
