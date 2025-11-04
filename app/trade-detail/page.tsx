@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { fetchTrade, imgUrl, type Trade } from "@/lib/tradesApi";
+import { Pencil, Check, X} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -31,6 +32,11 @@ function TradeDetailPage() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
+    // Edits
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedNote, setEditedNote] = useState("");
+    const [saving, setSaving] = useState(false);
+
     // Lightbox
     const [isOpen, setIsOpen] = useState(false);
     const [index, setIndex] = useState(0);
@@ -54,6 +60,29 @@ function TradeDetailPage() {
             }
         }) ();
     }, [tradeId]); 
+
+    async function saveNote() {
+        if (!tradeId) return;
+        try {
+            setSaving(true);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/trades/${tradeId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ note: editedNote }),
+            });
+
+            if (!res.ok) throw new Error("Failed to update note");
+
+            const updated = await res.json();
+            setTrade(updated);
+            setIsEditing(false);
+        } catch (e) {
+            console.error(e);
+            alert("Error saving note");
+        } finally {
+            setSaving(false);
+        }
+    }
 
     const open = (i: number) => {setIndex(i); setIsOpen(true); };
     const close = () => setIsOpen(false);
@@ -101,8 +130,51 @@ function TradeDetailPage() {
                 <div className="space-y-8">
                     {/* Note */}
                     <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                        <h2 className="mb-2 text-lg font-medium text-slate-100">Note</h2>
+                    <div className="mb-2 flex items-center justify-between">
+                        <h2 className="text-lg font-medium text-slate-100 flex items-center gap-2">
+                        Note
+                        {!isEditing && (
+                            <button
+                            onClick={() => {
+                                setEditedNote(trade.note ?? "");
+                                setIsEditing(true);
+                            }}
+                            className="text-slate-400 hover:text-teal-400"
+                            >
+                            <Pencil size={16} />
+                            </button>
+                        )}
+                        </h2>
+
+                        {isEditing && (
+                        <div className="flex gap-2">
+                            <button
+                            onClick={saveNote}
+                            disabled={saving}
+                            className="text-teal-400 hover:text-teal-300"
+                            >
+                            <Check size={18} />
+                            </button>
+                            <button
+                            onClick={() => setIsEditing(false)}
+                            className="text-red-400 hover:text-red-300"
+                            >
+                            <X size={18} />
+                            </button>
+                        </div>
+                        )}
+                    </div>
+
+                    {isEditing ? (
+                        <textarea
+                        value={editedNote}
+                        onChange={(e) => setEditedNote(e.target.value)}
+                        rows={4}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
+                        />
+                    ) : (
                         <p className="text-slate-300">{trade.note?.trim() || "(no notes)"}</p>
+                    )}
                     </section>
 
                     {/* Images */}
