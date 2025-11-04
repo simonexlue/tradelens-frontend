@@ -5,11 +5,14 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { fetchTrade, imgUrl, type Trade } from "@/lib/tradesApi";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export default function TradeDetailPage() {
 
     const router = useRouter();
     const search = useSearchParams();
-    const tradeId = search.get("id");
+    const tradeId = search.get("id") ?? undefined;
 
     const [trade, setTrade] = useState<Trade | null>(null);
     const [error, setError] = useState<string | null>(null);
