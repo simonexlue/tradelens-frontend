@@ -1,105 +1,21 @@
-export type TradeListItem = {
-  id: string;
-  note: string | null;
-  created_at: string;
-  images: { s3_key: string }[];
-  image_count?: number;
-};
-
-export type TradeImage = {
-  id?: string;
-  s3_key: string;
-  width?: number | null;
-  height?: number | null;
-  created_at?: string;
-};
-
-export type Trade = {
-  id: string;
-  note: string | null;
-  created_at: string;
-  images: TradeImage[];
-  analysis?: {
-    what_happened?: string;
-    why_worked_or_not?: string;
-    tips?: string[];
-  } | null;
-};
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/+$/, "");
-const DEV_USER_ID = process.env.NEXT_PUBLIC_DEV_USER_ID!;
-
-export async function fetchTrades(opts: { limit?: number; cursor?: string | null }) {
-  const params = new URLSearchParams();
-  if (opts.limit) params.set("limit", String(opts.limit));
-  if (opts.cursor) params.set("cursor", opts.cursor!);
-
-  const url = `${API_BASE}/trades${params.toString() ? `?${params}` : ""}`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-      "x-user-id": DEV_USER_ID,
-    },
-    cache: "no-store",
-  });
-
-  if (!res.ok) throw new Error(`Failed to fetch trades (${res.status})`);
-  return (await res.json()) as { items: TradeListItem[]; nextCursor: string | null };
+// lib/tradesApi.ts 
+export async function listTrades() {
+  const r = await fetch('/api/trades', { cache: 'no-store' });
+  if (!r.ok) throw new Error('Failed to fetch trades');
+  return r.json();
 }
 
-export async function fetchTrade(id: string) {
-  const res = await fetch(`${API_BASE}/trades/${encodeURIComponent(id)}`, {
-    method: "GET",
-    headers: { accept: "application/json", "x-user-id": DEV_USER_ID },
-    cache: "no-store",
+export async function createTrade(payload: { note: string; takenAt?: string | null }) {
+  const r = await fetch('/api/trades', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const j = await res.json();
-      detail = j.detail || j.error || JSON.stringify(j);
-    } catch {
-      detail = await res.text().catch(() => "");
-    }
-    throw new Error(`Failed to fetch trade (${res.status}) ${detail}`.trim());
-  }
-  return (await res.json()) as Trade;
+  if (!r.ok) throw new Error('Failed to create trade');
+  return r.json() as Promise<{ tradeId: string }>;
 }
 
-export function imgUrl(s3Key: string, q?: Record<string, string | number>) {
-  const qs = q
-    ? "?" + new URLSearchParams(
-        Object.entries(q).map(([k, v]) => [k, String(v)])
-      ).toString()
-    : "";
-  return `/api/images/${s3Key}${qs}`;
-}
-
-export async function updateTradeNote(id: string, note: string) {
-  if (!API_BASE) throw new Error("API base not configured (NEXT_PUBLIC_API_BASE).");
-
-  const res = await fetch(`${API_BASE}/trades/${encodeURIComponent(id)}`, {
-    method: "PUT",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      "x-user-id": DEV_USER_ID,
-    },
-    body: JSON.stringify({ note }),
-  });
-
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const j = await res.json();
-      detail = j.detail || j.error || JSON.stringify(j);
-    } catch {
-      detail = await res.text().catch(() => "");
-    }
-    throw new Error(`Failed to update note (${res.status}) ${detail}`.trim());
-  }
-
-  return (await res.json()) as Trade;
+export function imageSrcForKey(key: string, opts?: Record<string, string | number>) {
+  const qs = opts ? '?' + new URLSearchParams(Object.entries(opts).map(([k,v]) => [k, String(v)])).toString() : '';
+  return `/api/images/${key}${qs}`; 
 }

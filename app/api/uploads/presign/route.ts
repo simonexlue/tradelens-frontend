@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const BACKEND = (process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/+$/, "");
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest) {
   if (!BACKEND) return new Response("BACKEND_BASE_URL not set", { status: 500 });
 
   const supabase = await getServerSupabase();
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.text();
 
-  const r = await fetch(`${BACKEND}/trades/${params.id}/images`, {
+  const r = await fetch(`${BACKEND}/uploads/presign`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
