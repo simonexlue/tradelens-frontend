@@ -8,6 +8,7 @@ import { Icons } from "@/components/icons"
 import { MainNav } from "@/components/main-nav"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { usePathname } from "next/navigation"
+import LogoutButton from "./LogOut";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -50,6 +51,7 @@ export function SiteHeader() {
                 <span className="sr-only">Twitter</span>
               </div>
             </Link>
+            <LogoutButton />
             <ThemeToggle />
           </nav>
         </div>
