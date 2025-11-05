@@ -6,29 +6,34 @@ export const dynamic = "force-dynamic";
 
 const BACKEND = (process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/+$/, "");
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, ctx: any) {
   if (!BACKEND) return new Response("BACKEND_BASE_URL not set", { status: 500 });
+
+  // 👇 Next 16 sometimes passes a Promise for ctx.params in prod builds
+  const params = await (ctx?.params ?? ctx);
+  const id = params?.id as string | undefined;
+  if (!id) return new Response("Missing trade id", { status: 400 });
 
   const supabase = await getServerSupabase();
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) return new Response("Not authenticated", { status: 401 });
 
-  const body = await req.text();
+  const body = await request.text();
 
-  const r = await fetch(`${BACKEND}/trades/${params.id}/images`, {
+  const r = await fetch(`${BACKEND}/trades/${id}/images`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      "content-type": req.headers.get("content-type") ?? "application/json",
+      "content-type": request.headers.get("content-type") ?? "application/json",
     },
     body,
+    cache: "no-store",
   });
 
-  return new Response(await r.text(), {
+  const text = await r.text().catch(() => "");
+  return new Response(text, {
     status: r.status,
-    headers: {
-      "content-type": r.headers.get("content-type") ?? "application/json",
-    },
+    headers: { "content-type": r.headers.get("content-type") ?? "application/json" },
   });
 }
