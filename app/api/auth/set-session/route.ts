@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
@@ -7,9 +7,8 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const { access_token, refresh_token } = await req.json();
-
   if (!access_token || !refresh_token) {
-    return new Response("Missing tokens", { status: 400 });
+    return new NextResponse("Missing tokens", { status: 400 });
   }
 
   const store = await cookies();
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
   );
 
   const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-  if (error) return new Response(error.message, { status: 401 });
+  if (error) return new NextResponse(error.message, { status: 401 });
 
-  return Response.json({ ok: true });
+  return NextResponse.json({ ok: true });
 }
