@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
           }
         },
       },
+      cookieEncoding: "base64url",
     }
   );
 
