@@ -61,15 +61,28 @@ export default function LoginPage() {
                 setIsSignUp(false); // Go back to sign-in
             } else {
                 // Sign In : Existing User
-                const {error} = await supabase.auth.signInWithPassword({
-                    email: email.trim(),
-                    password: password.trim()
+                const { error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password: password.trim(),
                 });
-                if(error) throw error;
+                if (error) throw error;
 
-                // Sign in success -> Redirect to landing
-                // Give cookie a moment to persist before navigation
-                await supabase.auth.getSession();
+                // 1) Read session from client
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error("No session after sign in");
+
+                // 2) Ask the server to set HTTP-only cookies
+                await fetch("/api/auth/set-session", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                }),
+                });
+
+                // 3) Navigate
                 router.replace("/trades-list");
             }
         } catch (err: any) {
