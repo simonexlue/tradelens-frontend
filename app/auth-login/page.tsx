@@ -68,7 +68,9 @@ export default function LoginPage() {
                 if(error) throw error;
 
                 // Sign in success -> Redirect to landing
-                router.push("/trades-list");
+                // Give cookie a moment to persist before navigation
+                await supabase.auth.getSession();
+                router.replace("/trades-list");
             }
         } catch (err: any) {
             setStatus({
