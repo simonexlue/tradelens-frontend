@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import { getServerSupabase } from "../_lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -6,36 +7,75 @@ export const dynamic = "force-dynamic";
 
 const BACKEND = (process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/+$/, "");
 
-export async function GET() {
-  if (!BACKEND) return new Response("BACKEND_BASE_URL not set", { status: 500 });
+async function getAccessTokenFromCookies(): Promise<string | undefined> {
+  const store = await cookies();
 
-  const supabase = await getServerSupabase();
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) return new Response("Not authenticated", { status: 401 });
+  // Common cookie names used in our auth flow
+  return (
+    store.get("sb-access-token")?.value ??
+    store.get("sb-access-token-v2")?.value ??
+    store.get("supabase-auth-token")?.value
+  );
+}
 
-  const r = await fetch(`${BACKEND}/trades`, {
+async function getAccessToken(): Promise<string | undefined> {
+  // 1) Try Supabase server client first
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return session.access_token;
+    }
+  } catch (e) {
+    console.error("getServerSupabase().auth.getSession() failed:", e);
+  }
+
+  // 2) Fallback: read directly from cookies
+  return getAccessTokenFromCookies();
+}
+
+export async function GET(req: NextRequest) {
+  if (!BACKEND) {
+    return new Response("BACKEND_BASE_URL not set", { status: 500 });
+  }
+
+  const token = await getAccessToken();
+  if (!token) {
+    return new Response("Not authenticated", { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const limit = searchParams.get("limit");
+  const url = limit
+    ? `${BACKEND}/trades?limit=${encodeURIComponent(limit)}`
+    : `${BACKEND}/trades`;
+
+  const r = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
 
   return new Response(await r.text(), {
     status: r.status,
-    headers: { "content-type": r.headers.get("content-type") ?? "application/json" },
+    headers: {
+      "content-type": r.headers.get("content-type") ?? "application/json",
+    },
   });
 }
 
 export async function POST(req: NextRequest) {
-  if (!BACKEND) return new Response("BACKEND_BASE_URL not set", { status: 500 });
+  if (!BACKEND) {
+    return new Response("BACKEND_BASE_URL not set", { status: 500 });
+  }
 
-  const supabase = await getServerSupabase();
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) return new Response("Not authenticated", { status: 401 });
+  const token = await getAccessToken();
+  if (!token) {
+    return new Response("Not authenticated", { status: 401 });
+  }
 
   const body = await req.text();
 
-  const r = await fetch(`${BACKEND}/trades`, {
+  const r = await fetch(`${BACKEND}/trades/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -46,6 +86,8 @@ export async function POST(req: NextRequest) {
 
   return new Response(await r.text(), {
     status: r.status,
-    headers: { "content-type": r.headers.get("content-type") ?? "application/json" },
+    headers: {
+      "content-type": r.headers.get("content-type") ?? "application/json",
+    },
   });
 }
