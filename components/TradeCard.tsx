@@ -1,14 +1,13 @@
 "use client";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 type Props = {
-    id: string;
-    note: string | null;
-    created_at: string;
-    thumbnail_s3_key?: string | null;
-    image_count?: number;
-}
+  id: string;
+  note: string | null;
+  created_at: string;
+  thumbnail_s3_key?: string | null;
+  image_count?: number;
+};
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -44,12 +43,12 @@ export default function TradeCard({
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         {imgSrc ? (
-          <Image
+          // plain <img> to avoid Next image optimizer stripping cookies
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={imgSrc}
             alt="Trade screenshot"
-            fill
-            sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
-            className="object-cover transition-transform group-hover:scale-[1.02]"
+            className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-slate-800 text-slate-400">
@@ -70,7 +69,9 @@ export default function TradeCard({
           {note?.slice(0, 80) || "(no note)"}
           {note && note.length > 80 ? "…" : ""}
         </p>
-        <div className="mt-3 text-xs text-slate-400">{formatDate(created_at)}</div>
+        <div className="mt-3 text-xs text-slate-400">
+          {formatDate(created_at)}
+        </div>
       </div>
     </div>
   );
