@@ -1,25 +1,38 @@
-import * as React from "react"
-import Link from "next/link"
+"use client";
 
-import { NavItem } from "@/types/nav"
-import { siteConfig } from "@/config/site"
-import { cn } from "@/lib/utils"
-import { Icons } from "@/components/icons"
+import * as React from "react";
+import Link from "next/link";
+import Image from "next/image";
+
+import { NavItem } from "@/types/nav";
+import { siteConfig } from "@/config/site";
+import { cn } from "@/lib/utils";
+
+import icon from "public/favicon.png"; // <-- your logo
 
 interface MainNavProps {
-  items?: NavItem[]
+  items?: NavItem[];
 }
 
 export function MainNav({ items }: MainNavProps) {
   return (
     <div className="flex gap-6 md:gap-10">
-      <Link href="/" className="flex items-center space-x-2">
-        <Icons.logo className="h-6 w-6" />
+      {/* Logo + Brand */}
+      <Link href="/trades-list" className="flex items-center space-x-2">
+        <Image
+          src={icon}
+          alt="TradeLens logo"
+          width={28}
+          height={28}
+          className="rounded-full"
+        />
         <span className="inline-block font-bold">{siteConfig.name}</span>
       </Link>
+
+      {/* Nav Items */}
       {items?.length ? (
         <nav className="flex gap-6">
-          {items?.map(
+          {items.map(
             (item, index) =>
               item.href && (
                 <Link
@@ -37,5 +50,5 @@ export function MainNav({ items }: MainNavProps) {
         </nav>
       ) : null}
     </div>
-  )
+  );
 }

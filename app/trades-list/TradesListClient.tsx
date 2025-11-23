@@ -93,9 +93,11 @@ export default function TradesListClient() {
       </div>
 
       <div className="mt-6 flex justify-center">
-        <Button disabled={loading || !cursor} onClick={() => loadMore(false)}>
-          {loading ? "Loading..." : cursor ? "Load more" : "No more"}
+        {cursor && (
+        <Button disabled={loading} onClick={() => loadMore(false)}>
+            {loading ? "Loading..." : "Load more"}
         </Button>
+        )}
       </div>
     </div>
   );
