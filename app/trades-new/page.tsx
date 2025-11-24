@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useRef } from "react";
+import { useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type CreateTradeResponse = { tradeId: string };
@@ -22,7 +22,7 @@ type CreateImageResponse = {
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
-export default function NewTradePage() {
+function NewTradePageInner() {
   const router = useRouter();
   const search = useSearchParams();
 
@@ -221,7 +221,7 @@ export default function NewTradePage() {
       // Decide which tradeId to use
       let tradeId = existingTradeId || "";
 
-      // If no existing tradeId, create a new trade 
+      // If no existing tradeId, create a new trade
       if (!tradeId) {
         tradeId = await createTrade();
       }
@@ -265,7 +265,6 @@ export default function NewTradePage() {
           {isAddImageMode ? "Add Image to Trade" : "New Trade"}
         </h1>
       </div>
-
 
       {error && (
         <div className="rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
@@ -342,5 +341,17 @@ export default function NewTradePage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function NewTradePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-2xl p-6 text-slate-300">Loading…</div>
+      }
+    >
+      <NewTradePageInner />
+    </Suspense>
   );
 }
