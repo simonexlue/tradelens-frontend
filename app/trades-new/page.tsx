@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type CreateTradeResponse = { tradeId: string };
 type PresignResponse = {
@@ -24,14 +24,17 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
 export default function NewTradePage() {
   const router = useRouter();
+  const search = useSearchParams();
+
+  // If tradeid exists, "add image to existing trade" mode
+  const existingTradeId = search.get("tradeId");
+
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
   const dropRef = useRef<HTMLDivElement | null>(null);
-
-  // --- helpers ---
 
   function extFromFilename(name: string) {
     const m = name.toLowerCase().match(/\.(png|jpe?g|webp)$/i);
@@ -59,7 +62,6 @@ export default function NewTradePage() {
     });
   }
 
-  // uses /api/trades (Next proxy) so Authorization is attached
   async function createTrade(): Promise<string> {
     const res = await fetch("/api/trades", {
       method: "POST",
@@ -78,7 +80,6 @@ export default function NewTradePage() {
     return data.tradeId;
   }
 
-  // also goes through Next proxy
   async function presign(tradeId: string, f: File): Promise<PresignResponse> {
     const extRaw = extFromFilename(f.name);
     const ext: "png" | "jpg" | "jpeg" | "webp" =
@@ -135,7 +136,6 @@ export default function NewTradePage() {
     });
   }
 
-  // Save image metadata via Next proxy
   async function saveImage(
     tradeId: string,
     key: string,
@@ -166,8 +166,6 @@ export default function NewTradePage() {
     }
     return JSON.parse(text) as CreateImageResponse;
   }
-
-  // --- UI handlers ---
 
   function validateAndSet(f: File | null) {
     if (!f) {
@@ -220,19 +218,21 @@ export default function NewTradePage() {
         return;
       }
 
-      // 1) Create trade
-      const tradeId = await createTrade();
+      // Decide which tradeId to use
+      let tradeId = existingTradeId || "";
 
-      // 2) Presign
+      // If no existing tradeId, create a new trade 
+      if (!tradeId) {
+        tradeId = await createTrade();
+      }
+
+      // Presign
       const { uploadUrl, key, contentType } = await presign(tradeId, file);
 
-      // 3) Get optional dimensions
       const dims = await getImageDimensions(file);
 
-      // 4) Upload to S3
       await putToS3(uploadUrl, contentType, file, (pct) => setProgress(pct));
 
-      // 5) Save image metadata
       const imageResp = await saveImage(tradeId, key, file, dims);
       console.log("POST /images <-", imageResp);
 
@@ -240,7 +240,7 @@ export default function NewTradePage() {
         throw new Error("Image insert missing imageId (check backend logs)");
       }
 
-      // 6) Navigate to detail
+      // Navigate back to detail of this trade
       router.push(`/trade-detail?id=${tradeId}`);
     } catch (err: any) {
       console.error(err);
@@ -250,9 +250,22 @@ export default function NewTradePage() {
     }
   }
 
+  const isAddImageMode = !!existingTradeId;
+
   return (
     <div className="mx-auto max-w-2xl p-6 space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-100">New Trade</h1>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => router.back()}
+          className="rounded-2xl border border-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
+        >
+          ← Back
+        </button>
+        <h1 className="text-2xl font-semibold text-slate-100">
+          {isAddImageMode ? "Add Image to Trade" : "New Trade"}
+        </h1>
+      </div>
+
 
       {error && (
         <div className="rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
@@ -260,18 +273,20 @@ export default function NewTradePage() {
         </div>
       )}
 
-      {/* Note input */}
-      <div className="space-y-2">
-        <label className="text-slate-200 text-sm">Note (optional)</label>
-        <textarea
-          className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none"
-          rows={3}
-          maxLength={1000}
-          placeholder="What happened on this trade?"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </div>
+      {/* only show note input when creating a brand new trade */}
+      {!isAddImageMode && (
+        <div className="space-y-2">
+          <label className="text-slate-200 text-sm">Note (optional)</label>
+          <textarea
+            className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none"
+            rows={3}
+            maxLength={1000}
+            placeholder="What happened on this trade?"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+      )}
 
       {/* Drop zone */}
       <div
@@ -280,7 +295,11 @@ export default function NewTradePage() {
         onDragOver={onDragOver}
         className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
       >
-        <p className="mb-4">Drag & drop your chart screenshot here</p>
+        <p className="mb-4">
+          {isAddImageMode
+            ? "Drag & drop another chart screenshot for this trade"
+            : "Drag & drop your chart screenshot here"}
+        </p>
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp"
@@ -315,7 +334,11 @@ export default function NewTradePage() {
           disabled={isUploading || !file}
           className="rounded-lg bg-teal-500 px-4 py-2 font-medium text-slate-900 hover:opacity-95 disabled:opacity-50"
         >
-          {isUploading ? "Uploading…" : "Upload"}
+          {isUploading
+            ? "Uploading…"
+            : isAddImageMode
+            ? "Upload Image"
+            : "Upload"}
         </button>
       </div>
     </div>

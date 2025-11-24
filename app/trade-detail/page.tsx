@@ -8,7 +8,14 @@ import { Pencil, Check, X } from "lucide-react";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-type ImageRec = { id?: string; s3_key: string };
+type ImageRec = {
+  id?: string;
+  s3_key: string;
+  width?: number;
+  height?: number;
+  created_at?: string;
+};
+
 type Trade = {
   id: string;
   note: string | null;
@@ -23,8 +30,8 @@ function imgUrl(s3Key: string, q?: Record<string, string | number>) {
         Object.entries(q).map(([k, v]) => [k, String(v)])
       ).toString()
     : "";
-  // Do not encode slashes in the path
-  return `/api/images/${s3Key}${qs}`;
+  // encodeURI keeps slashes intact
+  return `/api/images/${encodeURI(s3Key)}${qs}`;
 }
 
 async function fetchTrade(id: string): Promise<Trade> {
@@ -65,10 +72,14 @@ function TradeDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Edits
+  // Note edits
   const [isEditing, setIsEditing] = useState(false);
   const [editedNote, setEditedNote] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Image edit mode
+  const [isEditingImages, setIsEditingImages] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
 
   // Lightbox
   const [isOpen, setIsOpen] = useState(false);
@@ -109,7 +120,45 @@ function TradeDetailPage() {
     }
   }
 
+  async function handleDeleteImage(image: ImageRec) {
+    if (!tradeId) return;
+
+    if (!image.id) {
+      alert("Cannot delete this image: missing image id from backend.");
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this image from the trade?");
+    if (!confirmed) return;
+
+    try {
+      setDeletingImageId(image.id);
+      const res = await fetch(`/api/trades/${tradeId}/images/${image.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text().catch(() => "Failed to delete image"));
+      }
+
+      setTrade((prev) =>
+        prev
+          ? {
+              ...prev,
+              images: (prev.images ?? []).filter((img) => img.id !== image.id),
+            }
+          : prev
+      );
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Error deleting image");
+    } finally {
+      setDeletingImageId(null);
+    }
+  }
+
   const open = (i: number) => {
+    if (isEditingImages) return; // don't open lightbox in edit mode
     setIndex(i);
     setIsOpen(true);
   };
@@ -123,7 +172,7 @@ function TradeDetailPage() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/trades-list')}
             className="rounded-2xl border border-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
           >
             ← Back
@@ -132,8 +181,11 @@ function TradeDetailPage() {
         </div>
 
         <Button
-          onClick={() => router.push("/trades-new")}
-          className="bg-[#18B6B2] hover-bg-[#10a3a0] text-slate-900"
+          onClick={() => {
+            if (!tradeId) return;
+            router.push(`/trades-new?tradeId=${tradeId}`);
+          }}
+          className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900"
         >
           Upload another image
         </Button>
@@ -206,21 +258,54 @@ function TradeDetailPage() {
           {/* Images */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-medium text-slate-100">Images</h2>
-              <span className="text-xs text-slate-400">
-                {images.length} {images.length === 1 ? "image" : "images"}
-              </span>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-medium text-slate-100">Images</h2>
+                {!isEditingImages && images.length > 0 && (
+                  <button
+                    onClick={() => setIsEditingImages(true)}
+                    className="text-slate-400 hover:text-teal-400"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400">
+                  {images.length} {images.length === 1 ? "image" : "images"}
+                </span>
+
+                {isEditingImages && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsEditingImages(false)}
+                      className="text-teal-400 hover:text-teal-300"
+                    >
+                      <Check size={18} />
+                    </button>
+                    <button
+                      onClick={() => setIsEditingImages(false)}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {images.length === 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                No images yet. Use "Upload another image" to add screenshots
-              </div>
+              <p className="text-sm text-slate-400">
+                No images yet. Use{" "}
+                <span className="font-medium">&quot;Upload another image&quot;</span> to
+                add screenshots.
+              </p>
             ) : (
-              <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {images.map((img, i) => (
                   <button
                     key={img.id ?? img.s3_key}
+                    type="button"
                     onClick={() => open(i)}
                     className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/40"
                   >
@@ -228,9 +313,23 @@ function TradeDetailPage() {
                       src={imgUrl(img.s3_key, { fit: "thumb" })}
                       alt={`Screenshot ${i + 1}`}
                       loading="lazy"
-                      className="w-full transition-transform group-hover:scale-[1.02]"
+                      className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
                     />
                     <div className="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-teal-500/0 group-hover:ring-2 group-hover:ring-teal-500/40" />
+
+                    {isEditingImages && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteImage(img);
+                        }}
+                        disabled={deletingImageId === img.id}
+                        className="absolute right-2 top-2 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {deletingImageId === img.id ? "…" : "✕"}
+                      </button>
+                    )}
                   </button>
                 ))}
               </div>
