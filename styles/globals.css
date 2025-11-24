@@ -79,3 +79,9 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+@layer components {
+  .page-shell {
+    @apply mx-8 md:mx-8 xl:mx-20 py-6;
+  }
+}

@@ -57,7 +57,7 @@ export default function TradesListClient() {
   }
 
   return (
-    <div className="mx-4 md:mx-8 xl:mx-20 py-6">
+    <div>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-100">My Trades</h1>
