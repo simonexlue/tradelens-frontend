@@ -8,18 +8,21 @@ export async function getServerSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      // hooks wire to Next's cookie store
       cookies: {
         getAll() {
+          // Supabase expects { name, value }
           return store.getAll().map(({ name, value }) => ({ name, value }));
         },
         setAll(cookiesToSet) {
-          for (const { name, value, options } of cookiesToSet) {
-            store.set(name, value, options);
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              store.set(name, value, options);
+            });
+          } catch {
+            // Ignore in environments where cookie mutation isn't allowed
           }
         },
       },
-      // matches new helper’s cookie format
       cookieEncoding: "base64url",
     }
   );
