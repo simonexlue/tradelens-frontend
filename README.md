@@ -79,36 +79,91 @@ Upload a chart → AI analyzes the setup → AI returns structured notes → Use
 
 ## 🧭 Folder Structure (Frontend)
 
+```text
 tradelens-frontend/
-├── app/
-│ ├── layout.tsx
-│ ├── page.tsx
-│ ├── auth-login/
-│ ├── trades-list/
-│ ├── trade-new/
-│ └── trade-detail/
-│
-├── components/
-│ ├── ui/
-│ ├── TradeCard.tsx
-│ ├── UploadForm.tsx
-│ ├── AnalysisSection.tsx
-│ └── Navbar.tsx
-│
-├── lib/
-│ ├── utils.ts
-│ └── supabaseClient.ts
-│
-├── public/
-│ ├── favicon.png
-│ └── images/
-│
-├── styles/
-│ └── globals.css
-│
-├── tailwind.config.ts
+├── .editorconfig
+├── .eslintignore
+├── .eslintrc.json
+├── .gitignore
+├── .prettierignore
+├── .vscode
+│   └── settings.json
+├── README.md
+├── app
+│   ├── api
+│   │   ├── _lib
+│   │   │   └── supabaseServer.ts
+│   │   ├── auth
+│   │   │   └── set-session
+│   │   │       └── route.ts
+│   │   ├── debug
+│   │   │   └── session
+│   │   │       └── route.ts
+│   │   ├── images
+│   │   │   └── [...key]
+│   │   │       └── route.ts
+│   │   ├── trades
+│   │   │   ├── [id]
+│   │   │   │   ├── images
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── route.ts
+│   │   │   └── route.ts
+│   │   └── uploads
+│   │       └── presign
+│   │           └── route.ts
+│   ├── auth-login
+│   │   └── page.tsx
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── trade-detail
+│   │   └── page.tsx
+│   ├── trades-list
+│   │   └── page.tsx
+│   └── trades-new
+│       └── page.tsx
+├── components
+│   ├── AnalysisSection.tsx
+│   ├── LogOut.tsx
+│   ├── Navbar.tsx
+│   ├── TradeCard.tsx
+│   ├── UploadForm.tsx
+│   ├── icons.tsx
+│   ├── main-nav.tsx
+│   ├── site-header.tsx
+│   ├── tailwind-indicator.tsx
+│   ├── theme-provider.tsx
+│   ├── theme-toggle.tsx
+│   └── ui
+│       └── button.tsx
+├── components.json
+├── config
+│   └── site.ts
+├── lib
+│   ├── fonts.ts
+│   ├── supabaseClient.ts
+│   ├── tradesApi.ts
+│   └── utils.ts
+├── next-env.d.ts
 ├── next.config.mjs
-└── README.md
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── prettier.config.js
+├── public
+│   ├── favicon.ico
+│   ├── favicon.png
+│   ├── next.svg
+│   ├── thirteen.svg
+│   └── vercel.svg
+├── styles
+│   └── globals.css
+├── tailwind.config.js
+├── tsconfig.json
+├── tsconfig.tsbuildinfo
+└── types
+    └── nav.ts
+```
+
 
 ---
 
