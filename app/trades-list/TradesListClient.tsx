@@ -75,6 +75,12 @@ export default function TradesListClient() {
         </div>
       )}
 
+      {loading && items.length === 0 && (
+        <div className="flex w-full justify-center py-20">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-400 border-t-transparent"></div>
+        </div>
+      )}
+
       {/* Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-6">
         {items.map((t) => {
