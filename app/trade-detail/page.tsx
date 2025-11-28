@@ -23,6 +23,12 @@ type Trade = {
   images: ImageRec[];
 };
 
+type Analysis = {
+  what_happened: string;
+  why_result: string;
+  tips: string[];
+};
+
 function imgUrl(s3Key: string, q?: Record<string, string | number>) {
   const qs = q
     ? "?" +
@@ -47,6 +53,20 @@ async function updateTradeNote(id: string, note: string): Promise<Trade> {
     body: JSON.stringify({ note }),
   });
   if (!r.ok) throw new Error(await r.text().catch(() => "Failed to update note"));
+  return r.json();
+}
+
+async function runTradeAnalysisApi(tradeId: string, imageId: string): Promise<Analysis> {
+  const r = await fetch(`/api/trades/${tradeId}/analyze`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ imageId }),
+  });
+
+  if (!r.ok) {
+    throw new Error(await r.text().catch(() => "Failed to run analysis"));
+  }
+
   return r.json();
 }
 
@@ -85,6 +105,12 @@ function TradeDetailPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [index, setIndex] = useState(0);
 
+  // AI analysis
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   const images = useMemo(() => trade?.images ?? [], [trade]);
 
   useEffect(() => {
@@ -92,11 +118,21 @@ function TradeDetailPage() {
       setError("Missing trade id in query (?id=...)");
       return;
     }
+    setError(null);
+    setAnalysis(null);
+    setAnalysisError(null);
+    setSelectedImageId(null);
+
     (async () => {
       try {
         setLoading(true);
         const data = await fetchTrade(tradeId);
         setTrade(data);
+
+        // Auto-select first image if available
+        if (data.images && data.images.length > 0 && data.images[0].id) {
+          setSelectedImageId(data.images[0].id);
+        }
       } catch (e: any) {
         setError(e?.message ?? "Failed to load trade");
       } finally {
@@ -149,6 +185,11 @@ function TradeDetailPage() {
             }
           : prev
       );
+
+      // If we deleted the currently-selected image, clear or pick another
+      setSelectedImageId((prevSelected) =>
+        prevSelected === image.id ? null : prevSelected
+      );
     } catch (e: any) {
       console.error(e);
       alert(e?.message || "Error deleting image");
@@ -166,13 +207,33 @@ function TradeDetailPage() {
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
   const next = () => setIndex((i) => (i + 1) % images.length);
 
+  async function handleRunAnalysis() {
+    if (!tradeId) return;
+    if (!selectedImageId) {
+      setAnalysisError("Select a screenshot above to analyze.");
+      return;
+    }
+
+    try {
+      setAnalysisError(null);
+      setAnalysisLoading(true);
+      const result = await runTradeAnalysisApi(tradeId, selectedImageId);
+      setAnalysis(result);
+    } catch (e: any) {
+      console.error(e);
+      setAnalysisError(e?.message || "Failed to run analysis");
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
   return (
-    <div className="mx-4 md:mx-8 xl:mx-20 py-6">
+    <div>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/trades-list')}
+            onClick={() => router.push("/trades-list")}
             className="rounded-2xl border border-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
           >
             ← Back
@@ -302,51 +363,134 @@ function TradeDetailPage() {
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {images.map((img, i) => (
-                  <button
-                    key={img.id ?? img.s3_key}
-                    type="button"
-                    onClick={() => open(i)}
-                    className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/40"
-                  >
-                    <img
-                      src={imgUrl(img.s3_key, { fit: "thumb" })}
-                      alt={`Screenshot ${i + 1}`}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
-                    />
-                    <div className="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-teal-500/0 group-hover:ring-2 group-hover:ring-teal-500/40" />
+                {images.map((img, i) => {
+                  const isSelected = img.id && img.id === selectedImageId;
+                  return (
+                    <button
+                      key={img.id ?? img.s3_key}
+                      type="button"
+                      onClick={() => {
+                        if (img.id) {
+                          setSelectedImageId(img.id);
+                        }
+                        open(i);
+                      }}
+                      className={`group relative overflow-hidden rounded-2xl border bg-slate-950/40 ${
+                        isSelected
+                          ? "border-teal-500 ring-2 ring-teal-500/60"
+                          : "border-slate-800 hover:border-teal-500/40"
+                      }`}
+                    >
+                      <img
+                        src={imgUrl(img.s3_key, { fit: "thumb" })}
+                        alt={`Screenshot ${i + 1}`}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
+                      />
+                      <div className="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-teal-500/0 group-hover:ring-2 group-hover:ring-teal-500/40" />
 
-                    {isEditingImages && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteImage(img);
-                        }}
-                        disabled={deletingImageId === img.id}
-                        className="absolute right-2 top-2 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {deletingImageId === img.id ? "…" : "✕"}
-                      </button>
-                    )}
-                  </button>
-                ))}
+                      {isSelected && (
+                        <div className="absolute left-2 top-2 rounded-full bg-teal-600/80 px-2 py-0.5 text-[11px] font-medium text-slate-900">
+                          Selected for AI
+                        </div>
+                      )}
+
+                      {isEditingImages && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteImage(img);
+                          }}
+                          disabled={deletingImageId === img.id}
+                          className="absolute right-2 top-2 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {deletingImageId === img.id ? "…" : "✕"}
+                        </button>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </section>
 
           {/* Analysis */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <h2 className="mb-2 text-lg font-medium text-slate-100">Analysis</h2>
-            <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-slate-400">
-              No analysis yet. Waiting for AI integration.
-              <ul className="mt-2 list-disc pl-5">
-                <li>What happened</li>
-                <li>Why it worked / failed</li>
-                <li>2–3 tips to improve</li>
-              </ul>
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-slate-100">Analysis</h2>
+              <Button
+                size="sm"
+                onClick={handleRunAnalysis}
+                disabled={
+                  !tradeId ||
+                  !selectedImageId ||
+                  analysisLoading ||
+                  images.length === 0
+                }
+                className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900 disabled:opacity-60"
+              >
+                {analysisLoading
+                  ? "Analyzing…"
+                  : selectedImageId
+                  ? "Run AI Analysis"
+                  : "Select a screenshot"}
+              </Button>
             </div>
+
+            {analysisError && (
+              <div className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-sm text-red-300">
+                {analysisError}
+              </div>
+            )}
+
+            {analysisLoading && (
+              <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-sm text-slate-300">
+                Analyzing this trade setup… This may take a few seconds.
+              </div>
+            )}
+
+            {!analysis && !analysisLoading && (
+              <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-slate-400 text-sm">
+                No analysis yet. Select a screenshot above and click{" "}
+                <span className="font-medium text-teal-300">Run AI Analysis</span> to
+                generate:
+                <ul className="mt-2 list-disc pl-5">
+                  <li>What happened</li>
+                  <li>Why it worked / failed</li>
+                  <li>2–3 tips to improve next time</li>
+                </ul>
+              </div>
+            )}
+
+            {analysis && !analysisLoading && (
+              <div className="space-y-4 text-sm text-slate-200">
+                <div>
+                  <h3 className="text-base font-semibold text-[#18B6B2]">
+                    What happened
+                  </h3>
+                  <p className="mt-1 text-slate-200">{analysis.what_happened}</p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-semibold text-[#18B6B2]">
+                    Why it worked / failed
+                  </h3>
+                  <p className="mt-1 text-slate-200">{analysis.why_result}</p>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-semibold text-[#18B6B2]">
+                    Tips for next time
+                  </h3>
+                  <ul className="mt-1 list-disc pl-5 space-y-1">
+                    {analysis.tips.map((tip, i) => (
+                      <li key={i}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       )}
