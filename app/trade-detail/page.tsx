@@ -56,7 +56,10 @@ async function updateTradeNote(id: string, note: string): Promise<Trade> {
   return r.json();
 }
 
-async function runTradeAnalysisApi(tradeId: string, imageId: string): Promise<Analysis> {
+async function runTradeAnalysisApi(
+  tradeId: string,
+  imageId: string
+): Promise<Analysis> {
   const r = await fetch(`/api/trades/${tradeId}/analyze`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -243,12 +246,11 @@ function TradeDetailPage() {
 
         <Button
           onClick={() => {
-            if (!tradeId) return;
-            router.push(`/trades-new?tradeId=${tradeId}`);
+
           }}
-          className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900"
+          className=""
         >
-          Upload another image
+          Delete this trade
         </Button>
       </div>
 
@@ -365,36 +367,33 @@ function TradeDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {images.map((img, i) => {
                   const isSelected = img.id && img.id === selectedImageId;
+
                   return (
-                    <button
+                    <div
                       key={img.id ?? img.s3_key}
-                      type="button"
-                      onClick={() => {
-                        if (img.id) {
-                          setSelectedImageId(img.id);
-                        }
-                        open(i);
-                      }}
-                      className={`group relative overflow-hidden rounded-2xl border bg-slate-950/40 ${
-                        isSelected
-                          ? "border-teal-500 ring-2 ring-teal-500/60"
-                          : "border-slate-800 hover:border-teal-500/40"
-                      }`}
+                      className={`relative flex flex-col rounded-2xl border bg-slate-950/40
+                        ${
+                          isSelected
+                            ? "border-teal-500 ring-2 ring-teal-500/60"
+                            : "border-slate-800 hover:border-teal-500/40"
+                        }`}
                     >
-                      <img
-                        src={imgUrl(img.s3_key, { fit: "thumb" })}
-                        alt={`Screenshot ${i + 1}`}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
-                      />
-                      <div className="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-teal-500/0 group-hover:ring-2 group-hover:ring-teal-500/40" />
+                      {/* Image area (click = preview only) */}
+                      <button
+                        type="button"
+                        onClick={() => open(i)}
+                        disabled={isEditingImages}
+                        className="flex-1 overflow-hidden rounded-t-2xl"
+                      >
+                        <img
+                          src={imgUrl(img.s3_key, { fit: "thumb" })}
+                          alt={`Screenshot ${i + 1}`}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform hover:scale-[1.02]"
+                        />
+                      </button>
 
-                      {isSelected && (
-                        <div className="absolute left-2 top-2 rounded-full bg-teal-600/80 px-2 py-0.5 text-[11px] font-medium text-slate-900">
-                          Selected for AI
-                        </div>
-                      )}
-
+                      {/* Delete button in edit mode */}
                       {isEditingImages && (
                         <button
                           type="button"
@@ -403,12 +402,28 @@ function TradeDetailPage() {
                             handleDeleteImage(img);
                           }}
                           disabled={deletingImageId === img.id}
-                          className="absolute right-2 top-2 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
+                          className="absolute right-3 top-3 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
                         >
                           {deletingImageId === img.id ? "…" : "✕"}
                         </button>
                       )}
-                    </button>
+
+                      {/* AI selection footer bar (always at bottom) */}
+                      {!isEditingImages && (
+                        <button
+                          type="button"
+                          onClick={() => img.id && setSelectedImageId(img.id)}
+                          className={`w-full text-xs py-1.5 rounded-b-2xl font-medium border-t transition
+                            ${
+                              isSelected
+                                ? "bg-teal-500 text-slate-900 border-teal-500"
+                                : "bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700"
+                            }`}
+                        >
+                          {isSelected ? "Selected for AI" : "Use for AI"}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
