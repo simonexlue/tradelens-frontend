@@ -56,6 +56,15 @@ async function updateTradeNote(id: string, note: string): Promise<Trade> {
   return r.json();
 }
 
+async function deleteTradeApi(id: string): Promise<void> {
+  const r = await fetch(`/api/trades/${id}`, {
+    method: "DELETE",
+  });
+  if(!r.ok) {
+    throw new Error(await r.text().catch(()=> "Failed to delete trade"));
+  }
+}
+
 async function runTradeAnalysisApi(
   tradeId: string,
   imageId: string
@@ -103,6 +112,9 @@ function TradeDetailPage() {
   // Image edit mode
   const [isEditingImages, setIsEditingImages] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+
+  // Trade delete
+  const [deletingTrade, setDeletingTrade] = useState(false);
 
   // Lightbox
   const [isOpen, setIsOpen] = useState(false);
@@ -230,6 +242,27 @@ function TradeDetailPage() {
     }
   }
 
+  async function handleDeleteTrade() {
+    if(!tradeId) return;
+
+    const confirmed = window.confirm(
+      "Delete this trade and all associated screenshots and analysis? This cannot be undone"
+    );
+    if(!confirmed) return;
+
+    try {
+      setDeletingTrade(true);
+      await deleteTradeApi(tradeId);
+
+      // After success
+      router.push("/trades-list");
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Failed to delete trade");
+      setDeletingTrade(false);
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -244,14 +277,26 @@ function TradeDetailPage() {
           <h1 className="text-2xl font-semibold text-slate-100">Trade Details</h1>
         </div>
 
-        <Button
-          onClick={() => {
-
-          }}
-          className=""
-        >
-          Delete this trade
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => {
+              if (!tradeId || deletingTrade) return;
+              router.push(`/trades-new?tradeId=${tradeId}`);
+            }}
+            disabled={!tradeId || deletingTrade}
+            className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900 disabled:opacity-60"
+          >
+            Upload another image
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDeleteTrade}
+            disabled={!tradeId || deletingTrade}
+            className="border-red-500/60 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+          >
+            {deletingTrade ? "Deleting…" : "Delete trade"}
+          </Button>
+        </div>
       </div>
 
       {/* Error / Loading */}
