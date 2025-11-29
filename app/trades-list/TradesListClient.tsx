@@ -4,14 +4,7 @@ import { useEffect, useState } from "react";
 import TradeCard from "@/components/TradeCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-
-type TradeListItem = {
-  id: string;
-  note: string | null;
-  created_at: string; // ISO
-  images: { s3_key: string }[];
-  image_count?: number;
-};
+import { TradeListItem } from "@/types/trades";
 
 type PageResp = { items: TradeListItem[]; nextCursor: string | null };
 

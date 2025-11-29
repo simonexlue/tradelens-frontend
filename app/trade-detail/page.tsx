@@ -1,34 +1,15 @@
-"use client";
+"use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Pencil, Check, X } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Check, Pencil, X } from "lucide-react"
 
-export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
+import { Button } from "@/components/ui/button"
 
-type ImageRec = {
-  id?: string;
-  s3_key: string;
-  width?: number;
-  height?: number;
-  created_at?: string;
-};
+import type { TradeDetail, TradeAnalysis, ImageRec } from "@/types/trades"
 
-type Trade = {
-  id: string;
-  note: string | null;
-  created_at: string;
-  images: ImageRec[];
-  analysis?: Analysis | null;
-};
-
-type Analysis = {
-  what_happened: string;
-  why_result: string;
-  tips: string[];
-};
+export const dynamic = "force-dynamic"
+export const fetchCache = "force-no-store"
 
 function imgUrl(s3Key: string, q?: Record<string, string | number>) {
   const qs = q
@@ -36,51 +17,53 @@ function imgUrl(s3Key: string, q?: Record<string, string | number>) {
       new URLSearchParams(
         Object.entries(q).map(([k, v]) => [k, String(v)])
       ).toString()
-    : "";
+    : ""
   // encodeURI keeps slashes intact
-  return `/api/images/${encodeURI(s3Key)}${qs}`;
+  return `/api/images/${encodeURI(s3Key)}${qs}`
 }
 
-async function fetchTrade(id: string): Promise<Trade> {
-  const r = await fetch(`/api/trades/${id}`, { cache: "no-store" });
-  if (!r.ok) throw new Error(await r.text().catch(() => "Failed to fetch trade"));
-  return r.json();
+async function fetchTrade(id: string): Promise<TradeDetail> {
+  const r = await fetch(`/api/trades/${id}`, { cache: "no-store" })
+  if (!r.ok)
+    throw new Error(await r.text().catch(() => "Failed to fetch trade"))
+  return r.json()
 }
 
-async function updateTradeNote(id: string, note: string): Promise<Trade> {
+async function updateTradeNote(id: string, note: string): Promise<TradeDetail> {
   const r = await fetch(`/api/trades/${id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ note }),
-  });
-  if (!r.ok) throw new Error(await r.text().catch(() => "Failed to update note"));
-  return r.json();
+  })
+  if (!r.ok)
+    throw new Error(await r.text().catch(() => "Failed to update note"))
+  return r.json()
 }
 
 async function deleteTradeApi(id: string): Promise<void> {
   const r = await fetch(`/api/trades/${id}`, {
     method: "DELETE",
-  });
-  if(!r.ok) {
-    throw new Error(await r.text().catch(()=> "Failed to delete trade"));
+  })
+  if (!r.ok) {
+    throw new Error(await r.text().catch(() => "Failed to delete trade"))
   }
 }
 
 async function runTradeAnalysisApi(
   tradeId: string,
   imageId: string
-): Promise<Analysis> {
+): Promise<TradeAnalysis> {
   const r = await fetch(`/api/trades/${tradeId}/analyze`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ imageId }),
-  });
+  })
 
   if (!r.ok) {
-    throw new Error(await r.text().catch(() => "Failed to run analysis"));
+    throw new Error(await r.text().catch(() => "Failed to run analysis"))
   }
 
-  return r.json();
+  return r.json()
 }
 
 function Fallback() {
@@ -93,112 +76,112 @@ function Fallback() {
         <div className="h-40 animate-pulse rounded-2xl bg-slate-800" />
       </div>
     </div>
-  );
+  )
 }
 
 function TradeDetailPage() {
-  const router = useRouter();
-  const search = useSearchParams();
-  const tradeId = search.get("id") ?? undefined;
+  const router = useRouter()
+  const search = useSearchParams()
+  const tradeId = search.get("id") ?? undefined
 
-  const [trade, setTrade] = useState<Trade | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [trade, setTrade] = useState<TradeDetail | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // Note edits
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedNote, setEditedNote] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedNote, setEditedNote] = useState("")
+  const [saving, setSaving] = useState(false)
 
   // Image edit mode
-  const [isEditingImages, setIsEditingImages] = useState(false);
-  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+  const [isEditingImages, setIsEditingImages] = useState(false)
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
 
   // Trade delete
-  const [deletingTrade, setDeletingTrade] = useState(false);
+  const [deletingTrade, setDeletingTrade] = useState(false)
 
   // Lightbox
-  const [isOpen, setIsOpen] = useState(false);
-  const [index, setIndex] = useState(0);
+  const [isOpen, setIsOpen] = useState(false)
+  const [index, setIndex] = useState(0)
 
   // AI analysis
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
+  const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
-  const images = useMemo(() => trade?.images ?? [], [trade]);
+  const images = useMemo(() => trade?.images ?? [], [trade])
 
   useEffect(() => {
     if (!tradeId) {
-      setError("Missing trade id in query (?id=...)");
-      return;
+      setError("Missing trade id in query (?id=...)")
+      return
     }
-    setError(null);
-    setAnalysis(null);
-    setAnalysisError(null);
-    setSelectedImageId(null);
+    setError(null)
+    setAnalysis(null)
+    setAnalysisError(null)
+    setSelectedImageId(null)
 
-    (async () => {
+    ;(async () => {
       try {
-        setLoading(true);
-        const data = await fetchTrade(tradeId);
-        setTrade(data);
+        setLoading(true)
+        const data = await fetchTrade(tradeId)
+        setTrade(data)
 
         // Auto-select first image if available
         if (data.images && data.images.length > 0 && data.images[0].id) {
-          setSelectedImageId(data.images[0].id);
+          setSelectedImageId(data.images[0].id)
 
           if (data.analysis) {
             setAnalysis({
               what_happened: data.analysis.what_happened,
               why_result: data.analysis.why_result,
               tips: data.analysis.tips ?? [],
-            });
+            })
           }
         }
       } catch (e: any) {
-        setError(e?.message ?? "Failed to load trade");
+        setError(e?.message ?? "Failed to load trade")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    })();
-  }, [tradeId]);
+    })()
+  }, [tradeId])
 
   async function saveNote() {
-    if (!tradeId) return;
+    if (!tradeId) return
     try {
-      setSaving(true);
-      const updated = await updateTradeNote(tradeId, editedNote);
-      setTrade(updated);
-      setIsEditing(false);
+      setSaving(true)
+      const updated = await updateTradeNote(tradeId, editedNote)
+      setTrade(updated)
+      setIsEditing(false)
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Error saving note");
+      console.error(e)
+      alert(e?.message || "Error saving note")
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
   async function handleDeleteImage(image: ImageRec) {
-    if (!tradeId) return;
+    if (!tradeId) return
 
     if (!image.id) {
-      alert("Cannot delete this image: missing image id from backend.");
-      return;
+      alert("Cannot delete this image: missing image id from backend.")
+      return
     }
 
-    const confirmed = window.confirm("Delete this image from the trade?");
-    if (!confirmed) return;
+    const confirmed = window.confirm("Delete this image from the trade?")
+    if (!confirmed) return
 
     try {
-      setDeletingImageId(image.id);
+      setDeletingImageId(image.id)
       const res = await fetch(`/api/trades/${tradeId}/images/${image.id}`, {
         method: "DELETE",
-      });
+      })
 
       if (!res.ok) {
-        throw new Error(await res.text().catch(() => "Failed to delete image"));
+        throw new Error(await res.text().catch(() => "Failed to delete image"))
       }
 
       setTrade((prev) =>
@@ -208,67 +191,67 @@ function TradeDetailPage() {
               images: (prev.images ?? []).filter((img) => img.id !== image.id),
             }
           : prev
-      );
+      )
 
       // If we deleted the currently-selected image, clear or pick another
       setSelectedImageId((prevSelected) =>
         prevSelected === image.id ? null : prevSelected
-      );
+      )
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Error deleting image");
+      console.error(e)
+      alert(e?.message || "Error deleting image")
     } finally {
-      setDeletingImageId(null);
+      setDeletingImageId(null)
     }
   }
 
   const open = (i: number) => {
-    if (isEditingImages) return; // don't open lightbox in edit mode
-    setIndex(i);
-    setIsOpen(true);
-  };
-  const close = () => setIsOpen(false);
-  const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
-  const next = () => setIndex((i) => (i + 1) % images.length);
+    if (isEditingImages) return // don't open lightbox in edit mode
+    setIndex(i)
+    setIsOpen(true)
+  }
+  const close = () => setIsOpen(false)
+  const prev = () => setIndex((i) => (i - 1 + images.length) % images.length)
+  const next = () => setIndex((i) => (i + 1) % images.length)
 
   async function handleRunAnalysis() {
-    if (!tradeId) return;
+    if (!tradeId) return
     if (!selectedImageId) {
-      setAnalysisError("Select a screenshot above to analyze.");
-      return;
+      setAnalysisError("Select a screenshot above to analyze.")
+      return
     }
 
     try {
-      setAnalysisError(null);
-      setAnalysisLoading(true);
-      const result = await runTradeAnalysisApi(tradeId, selectedImageId);
-      setAnalysis(result);
+      setAnalysisError(null)
+      setAnalysisLoading(true)
+      const result = await runTradeAnalysisApi(tradeId, selectedImageId)
+      setAnalysis(result)
     } catch (e: any) {
-      console.error(e);
-      setAnalysisError(e?.message || "Failed to run analysis");
+      console.error(e)
+      setAnalysisError(e?.message || "Failed to run analysis")
     } finally {
-      setAnalysisLoading(false);
+      setAnalysisLoading(false)
     }
   }
 
   async function handleDeleteTrade() {
-    if(!tradeId) return;
+    if (!tradeId) return
 
     const confirmed = window.confirm(
       "Delete this trade and all associated screenshots and analysis? This cannot be undone"
-    );
-    if(!confirmed) return;
+    )
+    if (!confirmed) return
 
     try {
-      setDeletingTrade(true);
-      await deleteTradeApi(tradeId);
+      setDeletingTrade(true)
+      await deleteTradeApi(tradeId)
 
       // After success
-      router.push("/trades-list");
+      router.push("/trades-list")
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Failed to delete trade");
-      setDeletingTrade(false);
+      console.error(e)
+      alert(e?.message || "Failed to delete trade")
+      setDeletingTrade(false)
     }
   }
 
@@ -283,14 +266,16 @@ function TradeDetailPage() {
           >
             ← Back
           </button>
-          <h1 className="text-2xl font-semibold text-slate-100">Trade Details</h1>
+          <h1 className="text-2xl font-semibold text-slate-100">
+            Trade Details
+          </h1>
         </div>
 
         <div className="flex items-center gap-3">
           <Button
             onClick={() => {
-              if (!tradeId || deletingTrade) return;
-              router.push(`/trades-new?tradeId=${tradeId}`);
+              if (!tradeId || deletingTrade) return
+              router.push(`/trades-new?tradeId=${tradeId}`)
             }}
             disabled={!tradeId || deletingTrade}
             className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900 disabled:opacity-60"
@@ -331,8 +316,8 @@ function TradeDetailPage() {
                 {!isEditing && (
                   <button
                     onClick={() => {
-                      setEditedNote(trade.note ?? "");
-                      setIsEditing(true);
+                      setEditedNote(trade.note ?? "")
+                      setIsEditing(true)
                     }}
                     className="text-slate-400 hover:text-teal-400"
                   >
@@ -368,9 +353,88 @@ function TradeDetailPage() {
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
               />
             ) : (
-              <p className="text-slate-300">{trade.note?.trim() || "(no notes)"}</p>
+              <p className="text-slate-300">
+                {trade.note?.trim() || "(no notes)"}
+              </p>
             )}
           </section>
+
+          {/* Overview + Timing */}
+          <section className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-2">
+              <h2 className="text-lg font-medium text-slate-100">Overview</h2>
+              <p className="text-xs text-slate-400">
+                Session:{" "}
+                <span className="text-slate-200">{trade.session ?? "—"}</span>
+              </p>
+              <p className="text-xs text-slate-400">
+                Outcome:{" "}
+                <span
+                  className={
+                    trade.outcome === "win"
+                      ? "text-emerald-400"
+                      : trade.outcome === "loss"
+                      ? "text-rose-400"
+                      : "text-slate-200"
+                  }
+                >
+                  {trade.outcome ?? "—"}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400">
+                R multiple:{" "}
+                <span
+                  className={
+                    trade.r_multiple != null && trade.r_multiple >= 0
+                      ? "text-emerald-400"
+                      : trade.r_multiple != null
+                      ? "text-rose-400"
+                      : "text-slate-200"
+                  }
+                >
+                  {trade.r_multiple != null
+                    ? `${trade.r_multiple.toFixed(2)}R`
+                    : "—"}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400">
+                Strategy:{" "}
+                <span className="text-slate-200">{trade.strategy ?? "—"}</span>
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-2">
+              <h2 className="text-lg font-medium text-slate-100">Timing</h2>
+              <p className="text-xs text-slate-400">
+                Entry:{" "}
+                <span className="text-slate-200">
+                  {trade.taken_at
+                    ? new Date(trade.taken_at).toLocaleString()
+                    : "—"}
+                </span>
+              </p>
+              <p className="text-xs text-slate-400">
+                Exit:{" "}
+                <span className="text-slate-200">
+                  {trade.exit_at
+                    ? new Date(trade.exit_at).toLocaleString()
+                    : "—"}
+                </span>
+              </p>
+            </div>
+          </section>
+
+          {/* Mistakes */}
+          {trade.mistakes && trade.mistakes.length > 0 && (
+            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+              <h2 className="text-lg font-medium text-slate-100">Mistakes</h2>
+              <ul className="mt-2 list-disc list-inside text-xs text-slate-300 space-y-1">
+                {trade.mistakes.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Images */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -414,13 +478,15 @@ function TradeDetailPage() {
             {images.length === 0 ? (
               <p className="text-sm text-slate-400">
                 No images yet. Use{" "}
-                <span className="font-medium">&quot;Upload another image&quot;</span> to
-                add screenshots.
+                <span className="font-medium">
+                  &quot;Upload another image&quot;
+                </span>{" "}
+                to add screenshots.
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {images.map((img, i) => {
-                  const isSelected = img.id && img.id === selectedImageId;
+                  const isSelected = img.id && img.id === selectedImageId
 
                   return (
                     <div
@@ -452,8 +518,8 @@ function TradeDetailPage() {
                         <button
                           type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteImage(img);
+                            e.stopPropagation()
+                            handleDeleteImage(img)
                           }}
                           disabled={deletingImageId === img.id}
                           className="absolute right-3 top-3 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
@@ -478,7 +544,7 @@ function TradeDetailPage() {
                         </button>
                       )}
                     </div>
-                  );
+                  )
                 })}
               </div>
             )}
@@ -522,8 +588,10 @@ function TradeDetailPage() {
             {!analysis && !analysisLoading && (
               <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-slate-400 text-sm">
                 No analysis yet. Select a screenshot above and click{" "}
-                <span className="font-medium text-teal-300">Run AI Analysis</span> to
-                generate:
+                <span className="font-medium text-teal-300">
+                  Run AI Analysis
+                </span>{" "}
+                to generate:
                 <ul className="mt-2 list-disc pl-5">
                   <li>What happened</li>
                   <li>Why it worked / failed</li>
@@ -538,7 +606,9 @@ function TradeDetailPage() {
                   <h3 className="text-base font-semibold text-[#18B6B2]">
                     What happened
                   </h3>
-                  <p className="mt-1 text-slate-200">{analysis.what_happened}</p>
+                  <p className="mt-1 text-slate-200">
+                    {analysis.what_happened}
+                  </p>
                 </div>
 
                 <div>
@@ -613,7 +683,7 @@ function TradeDetailPage() {
         </div>
       )}
     </div>
-  );
+  )
 }
 
 export default function Page() {
@@ -621,5 +691,5 @@ export default function Page() {
     <Suspense fallback={<Fallback />}>
       <TradeDetailPage />
     </Suspense>
-  );
+  )
 }
