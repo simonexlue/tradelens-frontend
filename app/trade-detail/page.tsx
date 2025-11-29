@@ -21,6 +21,7 @@ type Trade = {
   note: string | null;
   created_at: string;
   images: ImageRec[];
+  analysis?: Analysis | null;
 };
 
 type Analysis = {
@@ -147,6 +148,14 @@ function TradeDetailPage() {
         // Auto-select first image if available
         if (data.images && data.images.length > 0 && data.images[0].id) {
           setSelectedImageId(data.images[0].id);
+
+          if (data.analysis) {
+            setAnalysis({
+              what_happened: data.analysis.what_happened,
+              why_result: data.analysis.why_result,
+              tips: data.analysis.tips ?? [],
+            });
+          }
         }
       } catch (e: any) {
         setError(e?.message ?? "Failed to load trade");
