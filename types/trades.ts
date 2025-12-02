@@ -1,5 +1,5 @@
 export type TradeOutcome = "win" | "loss" | "breakeven" | "early_exit";
-export type Session = "London" | "NY" | "Break" | "Asian";
+export type Session = "London" | "NY" | "Break" | "Asia";
 
 export type ImageRec = {
   id: string;
@@ -13,7 +13,7 @@ export type TradeAnalysis = {
   what_happened: string;
   why_result: string;
   tips: string[];
-  created_at?: string; // optional so you can ignore it in UI if you want
+  created_at?: string;
 };
 
 export type TradeListItem = {

@@ -97,6 +97,21 @@ function Fallback() {
   );
 }
 
+// helper: convert ISO string to value acceptable by <input type="datetime-local">
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+  // datetime-local uses "YYYY-MM-DDTHH:mm"
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 function TradeDetailPage() {
   const router = useRouter();
   const search = useSearchParams();
@@ -116,6 +131,10 @@ function TradeDetailPage() {
   const [draftRMultiple, setDraftRMultiple] = useState<string>("");
   const [draftStrategy, setDraftStrategy] = useState<string>("");
   const [draftMistakes, setDraftMistakes] = useState<string>("");
+
+  // NEW: entry/exit drafts (datetime-local strings)
+  const [draftTakenAt, setDraftTakenAt] = useState<string>("");
+  const [draftExitAt, setDraftExitAt] = useState<string>("");
 
   // Image delete state
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
@@ -148,6 +167,8 @@ function TradeDetailPage() {
         ? from.mistakes.join("\n")
         : ""
     );
+    setDraftTakenAt(isoToLocalInput(from.taken_at ?? null));
+    setDraftExitAt(isoToLocalInput(from.exit_at ?? null));
   }
 
   useEffect(() => {
@@ -210,10 +231,18 @@ function TradeDetailPage() {
         .map((s) => s.trim())
         .filter(Boolean) ?? [];
 
+    // Convert datetime-local -> ISO for backend (or null)
+    const takenAtIso =
+      draftTakenAt.trim() !== "" ? new Date(draftTakenAt).toISOString() : null;
+    const exitAtIso =
+      draftExitAt.trim() !== "" ? new Date(draftExitAt).toISOString() : null;
+
     try {
       setSaving(true);
       const updated = await updateTrade(tradeId, {
         note: draftNote,
+        takenAt: takenAtIso,
+        exitAt: exitAtIso,
         outcome: draftOutcome ?? null,
         rMultiple: rMultipleValue,
         strategy: draftStrategy.trim() || null,
@@ -524,25 +553,54 @@ function TradeDetailPage() {
               </div>
             </div>
 
-            {/* Timing (read-only for now) */}
+            {/* Timing */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-2">
-              <h2 className="text-lg font-medium text-slate-100">Timing</h2>
-              <p className="text-xs text-slate-400">
-                Entry:{" "}
-                <span className="text-slate-200">
-                  {trade.taken_at
-                    ? new Date(trade.taken_at).toLocaleString()
-                    : "—"}
-                </span>
-              </p>
-              <p className="text-xs text-slate-400">
-                Exit:{" "}
-                <span className="text-slate-200">
-                  {trade.exit_at
-                    ? new Date(trade.exit_at).toLocaleString()
-                    : "—"}
-                </span>
-              </p>
+              <div className="mb-2 flex items-center gap-2">
+                <h2 className="text-lg font-medium text-slate-100">Timing</h2>
+                {editMode && (
+                  <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                    Local time
+                  </span>
+                )}
+              </div>
+
+              {/* Entry */}
+              <div className="text-xs text-slate-400 flex flex-col gap-1">
+                <span>Entry:</span>
+                {editMode ? (
+                  <input
+                    type="datetime-local"
+                    value={draftTakenAt}
+                    onChange={(e) => setDraftTakenAt(e.target.value)}
+                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+                  />
+                ) : (
+                  <span className="text-slate-200">
+                    {trade.taken_at
+                      ? new Date(trade.taken_at).toLocaleString()
+                      : "—"}
+                  </span>
+                )}
+              </div>
+
+              {/* Exit */}
+              <div className="text-xs text-slate-400 flex flex-col gap-1">
+                <span>Exit:</span>
+                {editMode ? (
+                  <input
+                    type="datetime-local"
+                    value={draftExitAt}
+                    onChange={(e) => setDraftExitAt(e.target.value)}
+                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+                  />
+                ) : (
+                  <span className="text-slate-200">
+                    {trade.exit_at
+                      ? new Date(trade.exit_at).toLocaleString()
+                      : "—"}
+                  </span>
+                )}
+              </div>
             </div>
           </section>
 
@@ -666,7 +724,7 @@ function TradeDetailPage() {
             )}
           </section>
 
-                    {/* Mistakes */}
+          {/* Mistakes */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <div className="mb-2 flex items-center gap-2">
               <h2 className="text-lg font-medium text-slate-100">Mistakes</h2>
@@ -704,7 +762,6 @@ function TradeDetailPage() {
               </p>
             )}
           </section>
-
 
           {/* Analysis (not affected by main edit mode) */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-4">
