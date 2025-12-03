@@ -43,6 +43,11 @@ function NewTradePageInner() {
   const [rMultiple, setRMultiple] = useState("")
   const [strategy, setStrategy] = useState("")
   const [mistakesText, setMistakesText] = useState("")
+  const [side, setSide] = useState<"" | "buy" | "sell">("")
+  const [entryPrice, setEntryPrice] = useState("")
+  const [exitPrice, setExitPrice] = useState("")
+  const [contracts, setContracts] = useState("")
+  const [pnl, setPnl] = useState("")
 
   const [strategyOptions, setStrategyOptions] = useState<string[]>([])
   const [loadingStrategies, setLoadingStrategies] = useState(true)
@@ -104,14 +109,49 @@ function NewTradePageInner() {
   }
 
   async function createTrade(): Promise<string> {
+    const parsedR = rMultiple ? Number(rMultiple) : null
+    if (rMultiple && !Number.isFinite(parsedR)) {
+      throw new Error("R multiple must be a valid number")
+    }
+
+    const parsedEntry = entryPrice ? Number(entryPrice) : null
+    if (entryPrice && !Number.isFinite(parsedEntry)) {
+      throw new Error("Entry price must be a valid number")
+    }
+
+    const parsedExit = exitPrice ? Number(exitPrice) : null
+    if (exitPrice && !Number.isFinite(parsedExit)) {
+      throw new Error("Exit price must be a valid number")
+    }
+
+    const parsedContracts =
+      contracts.trim() !== "" ? Number(contracts) : null;
+
+    if (parsedContracts !== null) {
+      if (!Number.isInteger(parsedContracts) || parsedContracts <= 0) {
+        throw new Error("Contracts must be a positive integer");
+      }
+    }
+
+    const parsedPnl = pnl ? Number(pnl) : null
+    if (pnl && !Number.isFinite(parsedPnl)) {
+      throw new Error("PnL must be a valid number")
+    }
+
+    // match CreateTradeBody in backend
     const payload = {
       note: note || "",
       takenAt: toIsoOrNull(takenAt),
       exitAt: toIsoOrNull(exitAt),
       outcome: outcome || null,
-      rMultiple: rMultiple ? Number(rMultiple) : null,
+      rMultiple: parsedR,
       strategy: strategy || null,
       mistakes: parseMistakes(mistakesText),
+      side: side || null,
+      entryPrice: parsedEntry,
+      exitPrice: parsedExit,
+      contracts: parsedContracts,
+      pnl: parsedPnl, 
     }
 
     const res = await fetch("/api/trades", {
@@ -324,7 +364,7 @@ function NewTradePageInner() {
       {/* only show metadata + note input when creating a brand new trade */}
       {!isAddImageMode && (
         <div className="space-y-4">
-          
+
           {/* Entry / Exit */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
@@ -382,6 +422,75 @@ function NewTradePageInner() {
               />
             </div>
           </div>
+
+          {/* Side + Contracts */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-slate-200 text-sm">Side</label>
+              <select
+                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                value={side}
+                onChange={(e) => setSide(e.target.value as "buy" | "sell" | "")}
+              >
+                <option value="">Select side</option>
+                <option value="buy">Buy (long)</option>
+                <option value="sell">Sell (short)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-slate-200 text-sm">Contracts</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                placeholder="e.g. 3"
+                value={contracts}
+                onChange={(e) => setContracts(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Entry / Exit price + PnL */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-1">
+              <label className="text-slate-200 text-sm">Entry price</label>
+              <input
+                type="number"
+                step="0.25"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                placeholder="e.g. 25193.50"
+                value={entryPrice}
+                onChange={(e) => setEntryPrice(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-slate-200 text-sm">Exit price</label>
+              <input
+                type="number"
+                step="0.25"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                placeholder="e.g. 25173.50"
+                value={exitPrice}
+                onChange={(e) => setExitPrice(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-slate-200 text-sm">PnL ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                placeholder="e.g. -100"
+                value={pnl}
+                onChange={(e) => setPnl(e.target.value)}
+              />
+            </div>
+          </div>
+
 
           {/* Strategy */}
           <div className="space-y-1">
