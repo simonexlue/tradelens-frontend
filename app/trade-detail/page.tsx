@@ -11,6 +11,7 @@ import type {
   TradeAnalysis,
   ImageRec,
   TradeOutcome,
+  TradeSide,
 } from "@/types/trades";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,11 @@ type UpdateTradePayload = {
   rMultiple?: number | null;
   strategy?: string | null;
   mistakes?: string[];
+  side?: TradeSide | null;
+  entryPrice?: number | null;
+  exitPrice?: number | null;
+  contracts?: number | null;
+  pnl?: number | null;
 };
 
 function imgUrl(s3Key: string, q?: Record<string, string | number>) {
@@ -132,9 +138,16 @@ function TradeDetailPage() {
   const [draftStrategy, setDraftStrategy] = useState<string>("");
   const [draftMistakes, setDraftMistakes] = useState<string>("");
 
-  // NEW: entry/exit drafts (datetime-local strings)
+  // NEW: entry/exit times (datetime-local strings)
   const [draftTakenAt, setDraftTakenAt] = useState<string>("");
   const [draftExitAt, setDraftExitAt] = useState<string>("");
+
+  // NEW: overview meta
+  const [draftSide, setDraftSide] = useState<TradeSide | null>(null);
+  const [draftEntryPrice, setDraftEntryPrice] = useState<string>("");
+  const [draftExitPrice, setDraftExitPrice] = useState<string>("");
+  const [draftContracts, setDraftContracts] = useState<string>("");
+  const [draftPnl, setDraftPnl] = useState<string>("");
 
   // Image delete state
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
@@ -169,6 +182,22 @@ function TradeDetailPage() {
     );
     setDraftTakenAt(isoToLocalInput(from.taken_at ?? null));
     setDraftExitAt(isoToLocalInput(from.exit_at ?? null));
+
+    setDraftSide(from.side ?? null);
+
+    setDraftEntryPrice(
+      from.entry_price != null ? from.entry_price.toString() : ""
+    );
+
+    setDraftExitPrice(
+      from.exit_price != null ? from.exit_price.toString() : ""
+    );
+
+    setDraftContracts(
+      from.contracts != null ? from.contracts.toString() : ""
+    );
+
+    setDraftPnl(from.pnl != null ? from.pnl.toString() : "");
   }
 
   useEffect(() => {
@@ -237,6 +266,46 @@ function TradeDetailPage() {
     const exitAtIso =
       draftExitAt.trim() !== "" ? new Date(draftExitAt).toISOString() : null;
 
+    // parse numeric meta
+    const parseNumberField = (
+      raw: string,
+      label: string
+    ): number | null | undefined => {
+      if (raw.trim() === "") return null;
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) {
+        alert(`${label} must be a number`);
+        throw new Error(`${label} must be a number`);
+      }
+      return parsed;
+    };
+
+    let entryPriceValue: number | null | undefined;
+    let exitPriceValue: number | null | undefined;
+    let contractsValue: number | null | undefined;
+    let pnlValue: number | null | undefined;
+
+    try {
+      entryPriceValue = parseNumberField(draftEntryPrice, "Entry price");
+      exitPriceValue = parseNumberField(draftExitPrice, "Exit price");
+
+      if (draftContracts.trim() === "") {
+        contractsValue = null;
+      } else {
+        const parsed = Number(draftContracts);
+        if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+          alert("Contracts must be an integer");
+          return;
+        }
+        contractsValue = parsed;
+      }
+
+      pnlValue = parseNumberField(draftPnl, "PnL");
+    } catch {
+      // parseNumberField already alerted
+      return;
+    }
+
     try {
       setSaving(true);
       const updated = await updateTrade(tradeId, {
@@ -247,6 +316,12 @@ function TradeDetailPage() {
         rMultiple: rMultipleValue,
         strategy: draftStrategy.trim() || null,
         mistakes: mistakeArray,
+        // NEW meta
+        side: draftSide ?? null,
+        entryPrice: entryPriceValue ?? null,
+        exitPrice: exitPriceValue ?? null,
+        contracts: contractsValue ?? null,
+        pnl: pnlValue ?? null,
       });
       setTrade(updated);
       hydrateDrafts(updated);
@@ -450,20 +525,125 @@ function TradeDetailPage() {
       {/* Content */}
       {trade && !loading && (
         <div className="space-y-8">
-          {/* Overview + Timing */}
-          <section className="grid gap-4 md:grid-cols-2">
-            {/* Overview */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-3">
-              <div className="mb-2 flex items-center gap-2">
-                <h2 className="text-lg font-medium text-slate-100">Overview</h2>
-                {editMode && (
-                  <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
-                    Editing
-                  </span>
-                )}
-              </div>
+          {/* Overview + Timing (merged) */}
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-lg font-medium text-slate-100">
+                Overview &amp; Timing
+              </h2>
+              {editMode && (
+                <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                  Editing
+                </span>
+              )}
+            </div>
 
-              <div className="text-xs text-slate-400 space-y-1">
+            <div className="grid gap-6 md:grid-cols-2 text-xs text-slate-400">
+              {/* Left column: trade meta */}
+              <div className="space-y-2">
+                {/* Side + Contracts */}
+                <div className="flex items-center justify-between gap-3">
+                  <span>Side / Contracts:</span>
+                  {editMode ? (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={draftSide ?? ""}
+                        onChange={(e) =>
+                          setDraftSide(
+                            (e.target.value || null) as TradeSide | null
+                          )
+                        }
+                        className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                      >
+                        <option value="">—</option>
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={draftContracts}
+                        onChange={(e) => setDraftContracts(e.target.value)}
+                        className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                        placeholder="#"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-slate-200">
+                      {trade.side ? trade.side.toUpperCase() : "—"}
+                      {" · "}
+                      {trade.contracts != null ? `${trade.contracts} ctr` : "—"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Entry / Exit price */}
+                <div className="flex items-center justify-between gap-3">
+                  <span>Entry / Exit price:</span>
+                  {editMode ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={draftEntryPrice}
+                        onChange={(e) => setDraftEntryPrice(e.target.value)}
+                        className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                        placeholder="Entry"
+                      />
+                      <span className="text-slate-500">→</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={draftExitPrice}
+                        onChange={(e) => setDraftExitPrice(e.target.value)}
+                        className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                        placeholder="Exit"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-slate-200">
+                      {trade.entry_price != null
+                        ? trade.entry_price.toFixed(2)
+                        : "—"}
+                      {" → "}
+                      {trade.exit_price != null
+                        ? trade.exit_price.toFixed(2)
+                        : "—"}
+                    </span>
+                  )}
+                </div>
+
+                {/* PnL */}
+                <div className="flex items-center justify-between gap-3">
+                  <span>PnL:</span>
+                  {editMode ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={draftPnl}
+                      onChange={(e) => setDraftPnl(e.target.value)}
+                      className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                      placeholder="PnL ($)"
+                    />
+                  ) : (
+                    <span
+                      className={
+                        trade.pnl != null && trade.pnl >= 0
+                          ? "text-emerald-400"
+                          : 
+                          trade.pnl != null
+                          ? "text-rose-400"
+                          : "text-slate-200"
+                      }
+                    >
+                      {trade.pnl != null
+                        ? `$${trade.pnl.toFixed(2)}`
+                        : "—"}
+                    </span>
+                  )}
+                </div>
+
                 {/* Outcome */}
                 <div className="flex items-center justify-between gap-3">
                   <span>Outcome:</span>
@@ -551,55 +731,55 @@ function TradeDetailPage() {
                   <span className="text-slate-200">{trade.session ?? "—"}</span>
                 </div>
               </div>
-            </div>
 
-            {/* Timing */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-2">
-              <div className="mb-2 flex items-center gap-2">
-                <h2 className="text-lg font-medium text-slate-100">Timing</h2>
-                {editMode && (
-                  <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
-                    Local time
-                  </span>
-                )}
-              </div>
+              {/* Right column: timing */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 font-medium">Timing</span>
+                  {editMode && (
+                    <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                      Local time
+                    </span>
+                  )}
+                </div>
 
-              {/* Entry */}
-              <div className="text-xs text-slate-400 flex flex-col gap-1">
-                <span>Entry:</span>
-                {editMode ? (
-                  <input
-                    type="datetime-local"
-                    value={draftTakenAt}
-                    onChange={(e) => setDraftTakenAt(e.target.value)}
-                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                  />
-                ) : (
-                  <span className="text-slate-200">
-                    {trade.taken_at
-                      ? new Date(trade.taken_at).toLocaleString()
-                      : "—"}
-                  </span>
-                )}
-              </div>
+                {/* Entry */}
+                <div className="flex flex-col gap-1">
+                  <span>Entry:</span>
+                  {editMode ? (
+                    <input
+                      type="datetime-local"
+                      value={draftTakenAt}
+                      onChange={(e) => setDraftTakenAt(e.target.value)}
+                      className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+                    />
+                  ) : (
+                    <span className="text-slate-200">
+                      {trade.taken_at
+                        ? new Date(trade.taken_at).toLocaleString()
+                        : "—"}
+                    </span>
+                  )}
+                </div>
 
-              {/* Exit */}
-              <div className="text-xs text-slate-400 flex flex-col gap-1">
-                <span>Exit:</span>
-                {editMode ? (
-                  <input
-                    type="datetime-local"
-                    value={draftExitAt}
-                    onChange={(e) => setDraftExitAt(e.target.value)}
-                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                  />
-                ) : (
-                  <span className="text-slate-200">
-                    {trade.exit_at
-                      ? new Date(trade.exit_at).toLocaleString()
-                      : "—"}
-                  </span>
-                )}
+                {/* Exit */}
+                <div className="flex flex-col gap-1">
+                  <span>Exit:</span>
+                  {editMode ? (
+                    <input
+                      type="datetime-local"
+                      value={draftExitAt}
+                      onChange={(e) => setDraftExitAt(e.target.value)}
+                      className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+                    />
+                  ) : (
+                    <span className="text-slate-200">
+                      {trade.exit_at
+                        ? new Date(trade.exit_at).toLocaleString()
+                        : "—"}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </section>

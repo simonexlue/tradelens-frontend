@@ -1,5 +1,6 @@
 export type TradeOutcome = "win" | "loss" | "breakeven" | "early_exit";
 export type Session = "London" | "NY" | "Break" | "Asia";
+export type TradeSide = "buy" | "sell";
 
 export type ImageRec = {
   id: string;
@@ -28,15 +29,23 @@ export type TradeDetail = {
   id: string;
   note: string | null;
   created_at: string;
+
   taken_at?: string | null;
   exit_at?: string | null;
+
   outcome?: TradeOutcome | null;
   r_multiple?: number | null;
   strategy?: string | null;
   session?: Session | null;
   mistakes?: string[] | null;
+
   images: ImageRec[];
   analysis?: TradeAnalysis | null;
+  side?: TradeSide | null;
+  entry_price?: number | null;
+  exit_price?: number | null;
+  contracts?: number | null;
+  pnl?: number | null;
 };
 
 export type CreateTradePayload = {
@@ -47,4 +56,9 @@ export type CreateTradePayload = {
   rMultiple?: number;
   strategy?: string;
   mistakes?: string[];
-}
+  side?: TradeSide;
+  entryPrice?: number;
+  exitPrice?: number;
+  contracts?: number;
+  pnl?: number;
+};
