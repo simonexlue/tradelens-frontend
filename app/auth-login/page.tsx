@@ -70,7 +70,7 @@ export default function LoginPage() {
 
         setStatus({
           type: "ok",
-          msg: "Account created! You can now sign in.",
+          msg: "Success! Please verify your email before signing in",
         })
         setIsSignUp(false)
       } else {
