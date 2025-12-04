@@ -138,11 +138,11 @@ function TradeDetailPage() {
   const [draftStrategy, setDraftStrategy] = useState<string>("");
   const [draftMistakes, setDraftMistakes] = useState<string>("");
 
-  // NEW: entry/exit times (datetime-local strings)
+  // entry/exit times (datetime-local strings)
   const [draftTakenAt, setDraftTakenAt] = useState<string>("");
   const [draftExitAt, setDraftExitAt] = useState<string>("");
 
-  // NEW: overview meta
+  // overview meta
   const [draftSide, setDraftSide] = useState<TradeSide | null>(null);
   const [draftEntryPrice, setDraftEntryPrice] = useState<string>("");
   const [draftExitPrice, setDraftExitPrice] = useState<string>("");
@@ -166,6 +166,12 @@ function TradeDetailPage() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const images = useMemo(() => trade?.images ?? [], [trade]);
+
+  const handleInput = (e:any) => {
+    e.target.style.height = "auto";
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
 
   // Initialize drafts from loaded trade
   function hydrateDrafts(from: TradeDetail) {
@@ -573,7 +579,7 @@ function TradeDetailPage() {
                     <span className="text-slate-200">
                       {trade.side ? trade.side.toUpperCase() : "—"}
                       {" · "}
-                      {trade.contracts != null ? `${trade.contracts} ctr` : "—"}
+                      {trade.contracts != null ? `${trade.contracts} contracts` : "—"}
                     </span>
                   )}
                 </div>
@@ -892,6 +898,7 @@ function TradeDetailPage() {
             {editMode ? (
               <textarea
                 value={draftNote}
+                onInput={handleInput}
                 onChange={(e) => setDraftNote(e.target.value)}
                 rows={4}
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
@@ -922,8 +929,8 @@ function TradeDetailPage() {
                 </p>
                 <textarea
                   value={draftMistakes}
+                  onInput={handleInput}
                   onChange={(e) => setDraftMistakes(e.target.value)}
-                  rows={4}
                   className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none"
                   placeholder={
                     "e.g.\nChased price into resistance\nIgnored 5m EMA context"

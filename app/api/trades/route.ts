@@ -10,7 +10,7 @@ const BACKEND = (process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_API_BAS
 async function getAccessTokenFromCookies(): Promise<string | undefined> {
   const store = await cookies();
 
-  // Common cookie names used in our auth flow
+  // Common cookie names used in auth flow
   return (
     store.get("sb-access-token")?.value ??
     store.get("sb-access-token-v2")?.value ??
@@ -46,9 +46,14 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const limit = searchParams.get("limit");
-  const url = limit
-    ? `${BACKEND}/trades?limit=${encodeURIComponent(limit)}`
-    : `${BACKEND}/trades`;
+  const cursor = searchParams.get("cursor");
+
+  const qs = new URLSearchParams();
+  if (limit) qs.set("limit", limit);
+  if (cursor) qs.set("cursor", cursor);
+
+  const url =
+    qs.toString().length > 0 ? `${BACKEND}/trades?${qs.toString()}` : `${BACKEND}/trades`;
 
   const r = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },

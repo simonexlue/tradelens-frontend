@@ -52,6 +52,11 @@ function NewTradePageInner() {
   const [strategyOptions, setStrategyOptions] = useState<string[]>([])
   const [loadingStrategies, setLoadingStrategies] = useState(true)
 
+  const handleInput = (e: any) => {
+    e.target.style.height = "auto";
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
   function toIsoOrNull(value: string): string | null {
     if (!value) return null
     const d = new Date(value)
@@ -369,7 +374,7 @@ function NewTradePageInner() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-slate-200 text-sm">
-                Entry time (optional)
+                Entry time
               </label>
               <input
                 type="datetime-local"
@@ -383,7 +388,7 @@ function NewTradePageInner() {
             </div>
             <div className="space-y-1">
               <label className="text-slate-200 text-sm">
-                Exit time (optional)
+                Exit time
               </label>
               <input
                 type="datetime-local"
@@ -423,16 +428,16 @@ function NewTradePageInner() {
             </div>
           </div>
 
-          {/* Side + Contracts */}
+          {/* Side (Position) + Contracts */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Side</label>
+              <label className="text-slate-200 text-sm">Position</label>
               <select
                 className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
                 value={side}
                 onChange={(e) => setSide(e.target.value as "buy" | "sell" | "")}
               >
-                <option value="">Select side</option>
+                <option value="">Select position</option>
                 <option value="buy">Buy (long)</option>
                 <option value="sell">Sell (short)</option>
               </select>
@@ -524,9 +529,9 @@ function NewTradePageInner() {
             </label>
             <textarea
               className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none text-sm"
-              rows={2}
               placeholder="e.g. Entered late, Ignored HTF trend"
               value={mistakesText}
+              onInput={handleInput}
               onChange={(e) => setMistakesText(e.target.value)}
             />
             <p className="text-xs text-slate-500">
@@ -540,9 +545,9 @@ function NewTradePageInner() {
             <textarea
               className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none"
               rows={3}
-              maxLength={1000}
               placeholder="What happened on this trade?"
               value={note}
+              onInput={handleInput}
               onChange={(e) => setNote(e.target.value)}
             />
           </div>

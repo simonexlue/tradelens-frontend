@@ -21,6 +21,7 @@ export type TradeListItem = {
   id: string;
   note: string | null;
   created_at: string;
+  taken_at: string | null;
   images: { s3_key: string; width?: number; height?: number }[]; // thumbnail only
   image_count: number;
 };
