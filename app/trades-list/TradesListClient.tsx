@@ -59,7 +59,7 @@ export default function TradesListClient() {
     strategies: [],
     symbols: [],
   });
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

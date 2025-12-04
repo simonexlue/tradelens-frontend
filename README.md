@@ -178,9 +178,6 @@ tradelens-frontend/
 - **Performance:**  
   - Thumbnails, pagination, caching  
   - Lazy image loading in list view  
-- **Reliability:**  
-  - Error tracking via Sentry  
-  - “Delete my account” flow  
 - **Legal:**  
   - “Not financial advice” disclaimer  
   - Clear privacy policy page

@@ -1092,7 +1092,7 @@ function TradeDetailPage() {
                 placeholder="What happened on this trade?"
               />
             ) : (
-              <p className="text-slate-300">
+              <p className="mt-1 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
                 {trade.note?.trim() || "(no notes)"}
               </p>
             )}
@@ -1125,7 +1125,7 @@ function TradeDetailPage() {
                 />
               </div>
             ) : trade.mistakes && trade.mistakes.length > 0 ? (
-              <ul className="mt-2 list-disc list-inside text-xs text-slate-300 space-y-1">
+              <ul className="mt-2 list-disc pl-5 space-y-1 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
                 {trade.mistakes.map((m, i) => (
                   <li key={i}>{m}</li>
                 ))}
