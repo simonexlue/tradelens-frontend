@@ -45,20 +45,14 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const limit = searchParams.get("limit");
-  const cursor = searchParams.get("cursor");
-
-  const qs = new URLSearchParams();
-  if (limit) qs.set("limit", limit);
-  if (cursor) qs.set("cursor", cursor);
-
-  const url =
-    qs.toString().length > 0 ? `${BACKEND}/trades?${qs.toString()}` : `${BACKEND}/trades`;
-
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
+  const upstreamUrl = new URL(`${BACKEND}/trades`);
+  searchParams.forEach((value, key) => {
+    upstreamUrl.searchParams.append(key, value);
   });
+  const r = await fetch(upstreamUrl.toString(), {
+    headers: { Authorization: `Bearer ${token}`},
+    cache: "no-store",
+  })
 
   return new Response(await r.text(), {
     status: r.status,

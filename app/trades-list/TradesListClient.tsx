@@ -19,6 +19,19 @@ type FilterState = {
   symbols: string[];
 };
 
+type FetchTradesOpts = {
+  limit: number;
+  cursor: string | null;
+  filters: FilterState;
+};
+
+type FilterOptions = {
+  outcomes: TradeOutcome[];
+  sessions: Session[];
+  strategies: string[];
+  symbols: string[];
+}
+
 const OUTCOME_LABELS: Record<TradeOutcome, string> = {
   win: "Win",
   loss: "Loss",
@@ -35,19 +48,24 @@ const SESSION_LABELS: Record<Session, string> = {
 
 const PAGE_LIMIT = 10;
 
-async function fetchTrades(opts: {
-  limit: number;
-  cursor: string | null;
-}): Promise<PageResp> {
+async function fetchTrades(opts: FetchTradesOpts): Promise<PageResp> {
   const qs = new URLSearchParams({
     limit: String(opts.limit),
     ...(opts.cursor ? { cursor: opts.cursor } : {}),
-  }).toString();
-  const r = await fetch(`/api/trades?${qs}`, { cache: "no-store" });
+  });
+
+  // Add filters as repeated query params: ?outcome=win&outcome=loss&session=London...
+  opts.filters.outcomes.forEach((o) => qs.append("outcome", o));
+  opts.filters.sessions.forEach((s) => qs.append("session", s));
+  opts.filters.strategies.forEach((s) => qs.append("strategy", s));
+  opts.filters.symbols.forEach((s) => qs.append("symbol", s));
+
+  const r = await fetch(`/api/trades?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok)
     throw new Error(await r.text().catch(() => "Failed loading trades"));
   return r.json();
 }
+
 
 export default function TradesListClient() {
   const [items, setItems] = useState<TradeListItem[]>([]);
@@ -59,78 +77,48 @@ export default function TradesListClient() {
     strategies: [],
     symbols: [],
   });
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    outcomes: [],
+    sessions: [],
+    strategies: [],
+    symbols: [],
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadMore(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Load available filter options (outcomes/sessions/strategies/symbols)
+    (async () => {
+      try {
+        const r = await fetch("/api/trades/filters", { cache: "no-store" });
+        if (!r.ok) {
+          console.error("Failed to load filter options", await r.text());
+          return;
+        }
+        const data = await r.json();
+        setFilterOptions({
+          outcomes: (data.outcomes ?? []) as TradeOutcome[],
+          sessions: (data.sessions ?? []) as Session[],
+          strategies: (data.strategies ?? []) as string[],
+          symbols: (data.symbols ?? []) as string[],
+        });
+      } catch (e) {
+        console.error("Failed to load filter options", e);
+      }
+    })();
   }, []);
 
-  const filterOptions = useMemo(() => {
-    const outcomeSet = new Set<TradeOutcome>();
-    const sessionSet = new Set<Session>();
-    const strategySet = new Set<string>();
-    const symbolSet = new Set<string>();
 
-    for (const t of items) {
-      if (t.outcome) outcomeSet.add(t.outcome);
-      if (t.session) sessionSet.add(t.session);
-      if (Array.isArray(t.strategies)) {
-        for (const raw of t.strategies) {
-          const s = raw?.trim();
-          if (s) strategySet.add(s);
-        }
-      }
-
-      if (t.symbol && t.symbol.trim() !== "") {
-        symbolSet.add(t.symbol.trim().toUpperCase());
-      }
-    }
-
-    return {
-      outcomes: Array.from(outcomeSet),
-      sessions: Array.from(sessionSet),
-      strategies: Array.from(strategySet),
-      symbols: Array.from(symbolSet),
-    };
-  }, [items]);
+  useEffect(() => {
+    void loadMore(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const hasActiveFilters =
     filters.outcomes.length > 0 ||
     filters.sessions.length > 0 ||
     filters.strategies.length > 0 ||
     filters.symbols.length > 0;
-
-  const filteredItems = useMemo(() => {
-    if (!hasActiveFilters) return items;
-
-    return items.filter((t) => {
-      const matchOutcome =
-        filters.outcomes.length === 0 ||
-        (t.outcome && filters.outcomes.includes(t.outcome));
-
-      const matchSession =
-        filters.sessions.length === 0 ||
-        (t.session && filters.sessions.includes(t.session));
-
-      // Trade matches if ANY of its strategies is in the active filter list
-      const matchStrategy =
-        filters.strategies.length === 0 ||
-        (Array.isArray(t.strategies) &&
-          t.strategies.some((raw) => {
-            const s = raw?.trim();
-            return s && filters.strategies.includes(s);
-          }));
-
-      const matchSymbol =
-        filters.symbols.length === 0 ||
-        (t.symbol &&
-          filters.symbols.includes(t.symbol.trim().toUpperCase()));
-
-      return matchOutcome && matchSession && matchStrategy && matchSymbol;
-    });
-  }, [items, filters, hasActiveFilters]);
 
   const activeFilterPills = useMemo(() => {
     const pills: { key: string; label: string; onClick: () => void }[] = [];
@@ -197,6 +185,7 @@ export default function TradesListClient() {
       const { items: newItems, nextCursor } = await fetchTrades({
         limit: PAGE_LIMIT,
         cursor: initial ? null : cursor,
+        filters, // pass current filters to the API
       });
       setItems((prev) => (initial ? newItems : [...prev, ...newItems]));
       setCursor(nextCursor);
@@ -206,6 +195,7 @@ export default function TradesListClient() {
       setLoading(false);
     }
   }
+
 
   return (
     <div>
@@ -346,7 +336,7 @@ export default function TradesListClient() {
 
       {/* Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-6">
-        {filteredItems.map((t) => {
+        {items.map((t) => {
           const firstKey = t.images?.[0]?.s3_key ?? null;
           const entryTime = t.taken_at ?? t.created_at;
           return (
@@ -363,13 +353,13 @@ export default function TradesListClient() {
       </div>
 
       <div className="mt-6 flex justify-center">
-        {cursor &&
-          (!hasActiveFilters || filteredItems.length >= PAGE_LIMIT) && (
-            <Button disabled={loading} onClick={() => loadMore(false)}>
-              {loading ? "Loading..." : "Load more"}
-            </Button>
-          )}
+        {cursor && (
+          <Button disabled={loading} onClick={() => loadMore(false)}>
+            {loading ? "Loading..." : "Load more"}
+          </Button>
+        )}
       </div>
+
     </div>
   );
 }
