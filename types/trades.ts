@@ -2,6 +2,21 @@ export type TradeOutcome = "win" | "loss" | "breakeven" | "early_exit";
 export type Session = "London" | "NY" | "Break" | "Asia";
 export type TradeSide = "buy" | "sell";
 
+export type UpdateTradePayload = {
+  note?: string
+  takenAt?: string | null
+  exitAt?: string | null
+  outcome?: TradeOutcome | null
+  strategies?: string[]
+  mistakes?: string[]
+  side?: TradeSide | null
+  entryPrice?: number | null
+  exitPrice?: number | null
+  contracts?: number | null
+  pnl?: number | null
+  symbol?: string | null
+}
+
 export type ImageRec = {
   id: string;
   s3_key: string;
@@ -22,9 +37,10 @@ export type TradeListItem = {
   note: string | null;
   created_at: string;
   taken_at: string | null;
-  outcome: "win" | "loss" | "breakeven" | "early_exit" | null
-  session: "London" | "NY" | "Break" | "Asia" | null
-  strategy: string | null
+  outcome: TradeOutcome | null;
+  session: Session | null;
+  strategies: string[] | null;
+  symbol: string | null;
   images: { s3_key: string; width?: number; height?: number }[]; // thumbnail only
   image_count: number;
 };
@@ -38,8 +54,7 @@ export type TradeDetail = {
   exit_at?: string | null;
 
   outcome?: TradeOutcome | null;
-  r_multiple?: number | null;
-  strategy?: string | null;
+  strategies?: string[] | null;
   session?: Session | null;
   mistakes?: string[] | null;
 
@@ -50,6 +65,7 @@ export type TradeDetail = {
   exit_price?: number | null;
   contracts?: number | null;
   pnl?: number | null;
+  symbol?: string | null;
 };
 
 export type CreateTradePayload = {
@@ -57,12 +73,12 @@ export type CreateTradePayload = {
   takenAt?: string | null;
   exitAt?: string | null;
   outcome?: TradeOutcome;
-  rMultiple?: number;
-  strategy?: string;
+  strategies?: string[];
   mistakes?: string[];
   side?: TradeSide;
   entryPrice?: number;
   exitPrice?: number;
   contracts?: number;
   pnl?: number;
+  symbol?: string;
 };

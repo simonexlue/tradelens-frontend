@@ -1,36 +1,62 @@
-"use client";
+"use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Pencil, X } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { ReactNode, Suspense, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Check, Pencil, X } from "lucide-react"
 
 import type {
-  TradeDetail,
-  TradeAnalysis,
   ImageRec,
+  Session,
+  TradeAnalysis,
+  TradeDetail,
   TradeOutcome,
   TradeSide,
-} from "@/types/trades";
+  UpdateTradePayload,
+} from "@/types/trades"
+import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
+import { ImageLightbox } from "@/components/ui/ImageLightbox"
+import { Button } from "@/components/ui/button"
 
-export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
+const OUTCOME_LABELS: Record<TradeOutcome, string> = {
+  win: "Win",
+  loss: "Loss",
+  breakeven: "Break Even",
+  early_exit: "Early Exit",
+}
 
-type UpdateTradePayload = {
-  note?: string;
-  takenAt?: string | null;
-  exitAt?: string | null;
-  outcome?: TradeOutcome | null;
-  rMultiple?: number | null;
-  strategy?: string | null;
-  mistakes?: string[];
-  side?: TradeSide | null;
-  entryPrice?: number | null;
-  exitPrice?: number | null;
-  contracts?: number | null;
-  pnl?: number | null;
-};
+const SESSION_LABELS: Record<Session, string> = {
+  London: "London",
+  NY: "New York",
+  Break: "Break",
+  Asia: "Asia",
+}
+
+const SIDE_LABELS: Record<TradeSide, string> = {
+  buy: "Long",
+  sell: "Short",
+}
+
+export const dynamic = "force-dynamic"
+export const fetchCache = "force-no-store"
+
+function OverviewTagPill({
+  children,
+  className = "",
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <span
+      className={[
+        "rounded-full border px-2 py-0.5 text-[10px]",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </span>
+  )
+}
 
 function imgUrl(s3Key: string, q?: Record<string, string | number>) {
   const qs = q
@@ -38,16 +64,16 @@ function imgUrl(s3Key: string, q?: Record<string, string | number>) {
       new URLSearchParams(
         Object.entries(q).map(([k, v]) => [k, String(v)])
       ).toString()
-    : "";
+    : ""
   // encodeURI keeps slashes intact
-  return `/api/images/${encodeURI(s3Key)}${qs}`;
+  return `/api/images/${encodeURI(s3Key)}${qs}`
 }
 
 async function fetchTrade(id: string): Promise<TradeDetail> {
-  const r = await fetch(`/api/trades/${id}`, { cache: "no-store" });
+  const r = await fetch(`/api/trades/${id}`, { cache: "no-store" })
   if (!r.ok)
-    throw new Error(await r.text().catch(() => "Failed to fetch trade"));
-  return r.json();
+    throw new Error(await r.text().catch(() => "Failed to fetch trade"))
+  return r.json()
 }
 
 async function updateTrade(
@@ -58,18 +84,18 @@ async function updateTrade(
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
-  });
+  })
   if (!r.ok)
-    throw new Error(await r.text().catch(() => "Failed to update trade"));
-  return r.json();
+    throw new Error(await r.text().catch(() => "Failed to update trade"))
+  return r.json()
 }
 
 async function deleteTradeApi(id: string): Promise<void> {
   const r = await fetch(`/api/trades/${id}`, {
     method: "DELETE",
-  });
+  })
   if (!r.ok) {
-    throw new Error(await r.text().catch(() => "Failed to delete trade"));
+    throw new Error(await r.text().catch(() => "Failed to delete trade"))
   }
 }
 
@@ -81,13 +107,21 @@ async function runTradeAnalysisApi(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ imageId }),
-  });
+  })
 
   if (!r.ok) {
-    throw new Error(await r.text().catch(() => "Failed to run analysis"));
+    throw new Error(await r.text().catch(() => "Failed to run analysis"))
   }
 
-  return r.json();
+  return r.json()
+}
+
+async function fetchStrategies(): Promise<string[]> {
+  const r = await fetch(`/api/trades/strategies`, { cache: "no-store" })
+  if (!r.ok)
+    throw new Error(await r.text().catch(() => "Failed to fetch strategies"))
+  const data = await r.json()
+  return data.strategies ?? []
 }
 
 function Fallback() {
@@ -100,133 +134,174 @@ function Fallback() {
         <div className="h-40 animate-pulse rounded-2xl bg-slate-800" />
       </div>
     </div>
-  );
+  )
 }
 
 // helper: convert ISO string to value acceptable by <input type="datetime-local">
 function isoToLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const year = d.getFullYear();
-  const month = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  const hours = pad(d.getHours());
-  const minutes = pad(d.getMinutes());
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const year = d.getFullYear()
+  const month = pad(d.getMonth() + 1)
+  const day = pad(d.getDate())
+  const hours = pad(d.getHours())
+  const minutes = pad(d.getMinutes())
   // datetime-local uses "YYYY-MM-DDTHH:mm"
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
 function TradeDetailPage() {
-  const router = useRouter();
-  const search = useSearchParams();
-  const tradeId = search.get("id") ?? undefined;
+  const router = useRouter()
+  const search = useSearchParams()
+  const tradeId = search.get("id") ?? undefined
 
-  const [trade, setTrade] = useState<TradeDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [trade, setTrade] = useState<TradeDetail | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // Global edit mode for all sections (except AI analysis)
-  const [editMode, setEditMode] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Drafts for fields while editing
-  const [draftNote, setDraftNote] = useState<string>("");
-  const [draftOutcome, setDraftOutcome] = useState<TradeOutcome | null>(null);
-  const [draftRMultiple, setDraftRMultiple] = useState<string>("");
-  const [draftStrategy, setDraftStrategy] = useState<string>("");
-  const [draftMistakes, setDraftMistakes] = useState<string>("");
+  const [draftNote, setDraftNote] = useState<string>("")
+  const [draftOutcome, setDraftOutcome] = useState<TradeOutcome | null>(null)
+  const [draftStrategies, setDraftStrategies] = useState<string[]>([])
+  const [draftMistakes, setDraftMistakes] = useState<string>("")
+  const [draftSymbol, setDraftSymbol] = useState<string>("")
 
   // entry/exit times (datetime-local strings)
-  const [draftTakenAt, setDraftTakenAt] = useState<string>("");
-  const [draftExitAt, setDraftExitAt] = useState<string>("");
+  const [draftTakenAt, setDraftTakenAt] = useState<string>("")
+  const [draftExitAt, setDraftExitAt] = useState<string>("")
 
   // overview meta
-  const [draftSide, setDraftSide] = useState<TradeSide | null>(null);
-  const [draftEntryPrice, setDraftEntryPrice] = useState<string>("");
-  const [draftExitPrice, setDraftExitPrice] = useState<string>("");
-  const [draftContracts, setDraftContracts] = useState<string>("");
-  const [draftPnl, setDraftPnl] = useState<string>("");
+  const [draftSide, setDraftSide] = useState<TradeSide | null>(null)
+  const [draftEntryPrice, setDraftEntryPrice] = useState<string>("")
+  const [draftExitPrice, setDraftExitPrice] = useState<string>("")
+  const [draftContracts, setDraftContracts] = useState<string>("")
+  const [draftPnl, setDraftPnl] = useState<string>("")
 
   // Image delete state
-  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
 
   // Trade delete
-  const [deletingTrade, setDeletingTrade] = useState(false);
+  const [deletingTrade, setDeletingTrade] = useState(false)
 
   // Lightbox
-  const [isOpen, setIsOpen] = useState(false);
-  const [index, setIndex] = useState(0);
+  const [isOpen, setIsOpen] = useState(false)
+  const [index, setIndex] = useState(0)
 
   // AI analysis
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
+  const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
-  const images = useMemo(() => trade?.images ?? [], [trade]);
+  // Strategy history + input
+  const [allStrategies, setAllStrategies] = useState<string[]>([])
+  const [strategyInput, setStrategyInput] = useState<string>("")
 
-  const handleInput = (e:any) => {
-    e.target.style.height = "auto";
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  };
+  const images = useMemo(() => trade?.images ?? [], [trade])
+  const lightboxImages = useMemo(
+    () => images.map((img) => ({ s3Key: img.s3_key })),
+    [images]
+  )
 
+  const effectiveStrategies =
+    (trade?.strategies && trade.strategies.length > 0
+      ? trade.strategies
+      : draftStrategies) ?? []
 
-  // Initialize drafts from loaded trade
+  const filteredSuggestions = useMemo(() => {
+    if (!strategyInput.trim()) return [] as string[]
+    const needle = strategyInput.trim().toLowerCase()
+    return allStrategies.filter(
+      (s) =>
+        s.toLowerCase().includes(needle) &&
+        !draftStrategies.some((sel) => sel.toLowerCase() === s.toLowerCase())
+    )
+  }, [allStrategies, draftStrategies, strategyInput])
+
   function hydrateDrafts(from: TradeDetail) {
-    setDraftNote(from.note ?? "");
-    setDraftOutcome(from.outcome ?? null);
-    setDraftRMultiple(
-      from.r_multiple != null ? from.r_multiple.toString() : ""
-    );
-    setDraftStrategy(from.strategy ?? "");
+    setDraftNote(from.note ?? "")
+    setDraftOutcome(from.outcome ?? null)
+    setDraftStrategies(from.strategies ?? [])
     setDraftMistakes(
-      from.mistakes && from.mistakes.length > 0
-        ? from.mistakes.join("\n")
-        : ""
-    );
-    setDraftTakenAt(isoToLocalInput(from.taken_at ?? null));
-    setDraftExitAt(isoToLocalInput(from.exit_at ?? null));
+      from.mistakes && from.mistakes.length > 0 ? from.mistakes.join("\n") : ""
+    )
+    setDraftTakenAt(isoToLocalInput(from.taken_at ?? null))
+    setDraftExitAt(isoToLocalInput(from.exit_at ?? null))
 
-    setDraftSide(from.side ?? null);
+    setDraftSide(from.side ?? null)
 
     setDraftEntryPrice(
       from.entry_price != null ? from.entry_price.toString() : ""
-    );
+    )
 
-    setDraftExitPrice(
-      from.exit_price != null ? from.exit_price.toString() : ""
-    );
+    setDraftExitPrice(from.exit_price != null ? from.exit_price.toString() : "")
 
-    setDraftContracts(
-      from.contracts != null ? from.contracts.toString() : ""
-    );
+    setDraftContracts(from.contracts != null ? from.contracts.toString() : "")
 
-    setDraftPnl(from.pnl != null ? from.pnl.toString() : "");
+    setDraftPnl(from.pnl != null ? from.pnl.toString() : "")
+
+    setDraftSymbol(from.symbol ?? "")
+  }
+
+  function handleAddStrategy(raw: string) {
+    const s = raw.trim()
+    if (!s) return
+    // de-dupe case-insensitive
+    const exists = draftStrategies.some(
+      (t) => t.toLowerCase() === s.toLowerCase()
+    )
+    if (exists) {
+      setStrategyInput("")
+      return
+    }
+    setDraftStrategies((prev) => [...prev, s])
+    setStrategyInput("")
+  }
+
+  function handleRemoveStrategy(tag: string) {
+    setDraftStrategies((prev) =>
+      prev.filter((t) => t.toLowerCase() !== tag.toLowerCase())
+    )
   }
 
   useEffect(() => {
-    if (!tradeId) {
-      setError("Missing trade id in query (?id=...)");
-      return;
-    }
-    setError(null);
-    setAnalysis(null);
-    setAnalysisError(null);
-    setSelectedImageId(null);
-    setEditMode(false); // reset mode when switching trades
-
-    (async () => {
+    // load strategy history once
+    ;(async () => {
       try {
-        setLoading(true);
-        const data = await fetchTrade(tradeId);
-        setTrade(data);
-        hydrateDrafts(data);
+        const history = await fetchStrategies()
+        setAllStrategies(history)
+      } catch (e) {
+        console.error(e)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (!tradeId) {
+      setError("Missing trade id in query (?id=...)")
+      return
+    }
+    setError(null)
+    setAnalysis(null)
+    setAnalysisError(null)
+    setSelectedImageId(null)
+    setEditMode(false) // reset mode when switching trades
+    ;(async () => {
+      try {
+        setLoading(true)
+        const data = await fetchTrade(tradeId)
+        setTrade(data)
+        hydrateDrafts(data)
 
         // Auto-select first image if available
         if (data.images && data.images.length > 0 && data.images[0].id) {
-          setSelectedImageId(data.images[0].id);
+          setSelectedImageId(data.images[0].id)
 
           if (data.analysis) {
             setAnalysis({
@@ -234,140 +309,129 @@ function TradeDetailPage() {
               why_result: data.analysis.why_result,
               tips: data.analysis.tips ?? [],
               created_at: data.analysis.created_at,
-            });
+            })
           }
         }
       } catch (e: any) {
-        setError(e?.message ?? "Failed to load trade");
+        setError(e?.message ?? "Failed to load trade")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    })();
-  }, [tradeId]);
+    })()
+  }, [tradeId])
 
   async function handleSaveAll() {
-    if (!tradeId) return;
-
-    // Parse R multiple
-    let rMultipleValue: number | null = null;
-    if (draftRMultiple.trim() !== "") {
-      const parsed = Number(draftRMultiple);
-      if (!Number.isFinite(parsed)) {
-        alert("R multiple must be a number");
-        return;
-      }
-      rMultipleValue = parsed;
-    }
+    if (!tradeId) return
 
     // Parse mistakes from text area (one per line, ignore empty)
     const mistakeArray =
       draftMistakes
         .split("\n")
         .map((s) => s.trim())
-        .filter(Boolean) ?? [];
+        .filter(Boolean) ?? []
 
     // Convert datetime-local -> ISO for backend (or null)
     const takenAtIso =
-      draftTakenAt.trim() !== "" ? new Date(draftTakenAt).toISOString() : null;
+      draftTakenAt.trim() !== "" ? new Date(draftTakenAt).toISOString() : null
     const exitAtIso =
-      draftExitAt.trim() !== "" ? new Date(draftExitAt).toISOString() : null;
+      draftExitAt.trim() !== "" ? new Date(draftExitAt).toISOString() : null
 
     // parse numeric meta
     const parseNumberField = (
       raw: string,
       label: string
     ): number | null | undefined => {
-      if (raw.trim() === "") return null;
-      const parsed = Number(raw);
+      if (raw.trim() === "") return null
+      const parsed = Number(raw)
       if (!Number.isFinite(parsed)) {
-        alert(`${label} must be a number`);
-        throw new Error(`${label} must be a number`);
+        alert(`${label} must be a number`)
+        throw new Error(`${label} must be a number`)
       }
-      return parsed;
-    };
+      return parsed
+    }
 
-    let entryPriceValue: number | null | undefined;
-    let exitPriceValue: number | null | undefined;
-    let contractsValue: number | null | undefined;
-    let pnlValue: number | null | undefined;
+    let entryPriceValue: number | null | undefined
+    let exitPriceValue: number | null | undefined
+    let contractsValue: number | null | undefined
+    let pnlValue: number | null | undefined
 
     try {
-      entryPriceValue = parseNumberField(draftEntryPrice, "Entry price");
-      exitPriceValue = parseNumberField(draftExitPrice, "Exit price");
+      entryPriceValue = parseNumberField(draftEntryPrice, "Entry price")
+      exitPriceValue = parseNumberField(draftExitPrice, "Exit price")
 
       if (draftContracts.trim() === "") {
-        contractsValue = null;
+        contractsValue = null
       } else {
-        const parsed = Number(draftContracts);
+        const parsed = Number(draftContracts)
         if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
-          alert("Contracts must be an integer");
-          return;
+          alert("Contracts must be an integer")
+          return
         }
-        contractsValue = parsed;
+        contractsValue = parsed
       }
 
-      pnlValue = parseNumberField(draftPnl, "PnL");
+      pnlValue = parseNumberField(draftPnl, "PnL")
     } catch {
       // parseNumberField already alerted
-      return;
+      return
     }
 
     try {
-      setSaving(true);
+      setSaving(true)
       const updated = await updateTrade(tradeId, {
         note: draftNote,
         takenAt: takenAtIso,
         exitAt: exitAtIso,
         outcome: draftOutcome ?? null,
-        rMultiple: rMultipleValue,
-        strategy: draftStrategy.trim() || null,
+        strategies: draftStrategies, // always array (can be empty to clear)
         mistakes: mistakeArray,
-        // NEW meta
         side: draftSide ?? null,
         entryPrice: entryPriceValue ?? null,
         exitPrice: exitPriceValue ?? null,
         contracts: contractsValue ?? null,
         pnl: pnlValue ?? null,
-      });
-      setTrade(updated);
-      hydrateDrafts(updated);
-      setEditMode(false);
+        symbol: draftSymbol.trim() || null,
+      })
+      setTrade(updated)
+      hydrateDrafts(updated)
+      setEditMode(false)
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Error saving trade details");
+      console.error(e)
+      alert(e?.message || "Error saving trade details")
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
   function handleCancelAll() {
     if (!trade) {
-      setEditMode(false);
-      return;
+      setEditMode(false)
+      return
     }
-    hydrateDrafts(trade);
-    setEditMode(false);
+    hydrateDrafts(trade)
+    setStrategyInput("")
+    setEditMode(false)
   }
 
   async function handleDeleteImage(image: ImageRec) {
-    if (!tradeId) return;
+    if (!tradeId) return
 
     if (!image.id) {
-      alert("Cannot delete this image: missing image id from backend.");
-      return;
+      alert("Cannot delete this image: missing image id from backend.")
+      return
     }
 
-    const confirmed = window.confirm("Delete this image from the trade?");
-    if (!confirmed) return;
+    const confirmed = window.confirm("Delete this image from the trade?")
+    if (!confirmed) return
 
     try {
-      setDeletingImageId(image.id);
+      setDeletingImageId(image.id)
       const res = await fetch(`/api/trades/${tradeId}/images/${image.id}`, {
         method: "DELETE",
-      });
+      })
 
       if (!res.ok) {
-        throw new Error(await res.text().catch(() => "Failed to delete image"));
+        throw new Error(await res.text().catch(() => "Failed to delete image"))
       }
 
       setTrade((prev) =>
@@ -377,67 +441,67 @@ function TradeDetailPage() {
               images: (prev.images ?? []).filter((img) => img.id !== image.id),
             }
           : prev
-      );
+      )
 
       // If we deleted the currently-selected image, clear or pick another
       setSelectedImageId((prevSelected) =>
         prevSelected === image.id ? null : prevSelected
-      );
+      )
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Error deleting image");
+      console.error(e)
+      alert(e?.message || "Error deleting image")
     } finally {
-      setDeletingImageId(null);
+      setDeletingImageId(null)
     }
   }
 
   const open = (i: number) => {
-    if (editMode) return; // don't open lightbox in edit mode
-    setIndex(i);
-    setIsOpen(true);
-  };
-  const close = () => setIsOpen(false);
-  const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
-  const next = () => setIndex((i) => (i + 1) % images.length);
+    if (editMode) return // don't open lightbox in edit mode
+    setIndex(i)
+    setIsOpen(true)
+  }
+  const close = () => setIsOpen(false)
+  const prev = () => setIndex((i) => (i - 1 + images.length) % images.length)
+  const next = () => setIndex((i) => (i + 1) % images.length)
 
   async function handleRunAnalysis() {
-    if (!tradeId) return;
+    if (!tradeId) return
     if (!selectedImageId) {
-      setAnalysisError("Select a screenshot above to analyze.");
-      return;
+      setAnalysisError("Select a screenshot above to analyze.")
+      return
     }
 
     try {
-      setAnalysisError(null);
-      setAnalysisLoading(true);
-      const result = await runTradeAnalysisApi(tradeId, selectedImageId);
-      setAnalysis(result);
+      setAnalysisError(null)
+      setAnalysisLoading(true)
+      const result = await runTradeAnalysisApi(tradeId, selectedImageId)
+      setAnalysis(result)
     } catch (e: any) {
-      console.error(e);
-      setAnalysisError(e?.message || "Failed to run analysis");
+      console.error(e)
+      setAnalysisError(e?.message || "Failed to run analysis")
     } finally {
-      setAnalysisLoading(false);
+      setAnalysisLoading(false)
     }
   }
 
   async function handleDeleteTrade() {
-    if (!tradeId) return;
+    if (!tradeId) return
 
     const confirmed = window.confirm(
       "Delete this trade and all associated screenshots and analysis? This cannot be undone"
-    );
-    if (!confirmed) return;
+    )
+    if (!confirmed) return
 
     try {
-      setDeletingTrade(true);
-      await deleteTradeApi(tradeId);
+      setDeletingTrade(true)
+      await deleteTradeApi(tradeId)
 
       // After success
-      router.push("/trades-list");
+      router.push("/trades-list")
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Failed to delete trade");
-      setDeletingTrade(false);
+      console.error(e)
+      alert(e?.message || "Failed to delete trade")
+      setDeletingTrade(false)
     }
   }
 
@@ -462,9 +526,9 @@ function TradeDetailPage() {
               {!editMode ? (
                 <button
                   onClick={() => {
-                    if (!trade) return;
-                    hydrateDrafts(trade);
-                    setEditMode(true);
+                    if (!trade) return
+                    hydrateDrafts(trade)
+                    setEditMode(true)
                   }}
                   className="text-slate-400 hover:text-teal-400"
                   aria-label="Edit trade"
@@ -497,8 +561,8 @@ function TradeDetailPage() {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => {
-              if (!tradeId || deletingTrade) return;
-              router.push(`/trades-new?tradeId=${tradeId}`);
+              if (!tradeId || deletingTrade) return
+              router.push(`/trades-new?tradeId=${tradeId}`)
             }}
             disabled={!tradeId || deletingTrade}
             className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900 disabled:opacity-60"
@@ -531,59 +595,112 @@ function TradeDetailPage() {
       {/* Content */}
       {trade && !loading && (
         <div className="space-y-8">
-          {/* Overview + Timing (merged) */}
+          {/* Overview */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-lg font-medium text-slate-100">
-                Overview &amp; Timing
-              </h2>
+              <h2 className="text-lg font-medium text-slate-100">Overview</h2>
               {editMode && (
-                <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                <OverviewTagPill className="border-teal-500/40 text-teal-300">
                   Editing
+                </OverviewTagPill>
+              )}
+            </div>
+
+            {/* Tag row: symbol/outcome/session/side/strategies */}
+            {!editMode && (
+              <div className="mb-3 flex flex-wrap gap-2 text-[10px]">
+                {/* Symbol pill */}
+                {trade.symbol && trade.symbol.trim() !== "" && (
+                  <OverviewTagPill className="border-amber-500/60 bg-amber-500/10 text-amber-200">
+                    {trade.symbol}
+                  </OverviewTagPill>
+                )}
+
+                {/* Outcome pill */}
+                {trade.outcome && (
+                  <OverviewTagPill
+                    className={
+                      trade.outcome === "win"
+                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                        : trade.outcome === "loss"
+                        ? "border-rose-500/60 bg-rose-500/15 text-rose-300"
+                        : "border-slate-600 bg-slate-800/80 text-slate-200"
+                    }
+                  >
+                    {OUTCOME_LABELS[trade.outcome]}
+                  </OverviewTagPill>
+                )}
+
+                {/* Session pill */}
+                {trade.session && (
+                  <OverviewTagPill className="border-slate-600 bg-slate-800/80 text-slate-200">
+                    {SESSION_LABELS[trade.session]}
+                  </OverviewTagPill>
+                )}
+
+                {/* Side pill */}
+                {trade.side && (
+                  <OverviewTagPill className="border-sky-500/60 bg-sky-500/15 text-sky-200">
+                    {SIDE_LABELS[trade.side]}
+                  </OverviewTagPill>
+                )}
+
+                {/* Strategy pills (multiple) */}
+                {effectiveStrategies.length > 0 &&
+                  effectiveStrategies.map((s) => (
+                    <OverviewTagPill
+                      key={s}
+                      className="max-w-[14rem] truncate border-teal-500/60 bg-teal-500/10 text-teal-200"
+                    >
+                      {s}
+                    </OverviewTagPill>
+                  ))}
+              </div>
+            )}
+
+            {/* Timing – full width */}
+            <div className="mb-4 space-y-1 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                {editMode && (
+                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
+                    Local time
+                  </OverviewTagPill>
+                )}
+              </div>
+
+              {editMode ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={draftTakenAt}
+                    onChange={(e) => setDraftTakenAt(e.target.value)}
+                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+                  />
+                  <span className="text-slate-500">→</span>
+                  <input
+                    type="datetime-local"
+                    value={draftExitAt}
+                    onChange={(e) => setDraftExitAt(e.target.value)}
+                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
+              ) : (
+                <span className="text-slate-200">
+                  {trade.taken_at
+                    ? new Date(trade.taken_at).toLocaleString()
+                    : "—"}
+                  {" → "}
+                  {trade.exit_at
+                    ? new Date(trade.exit_at).toLocaleString()
+                    : "—"}
                 </span>
               )}
             </div>
 
+            {/* Meta grid */}
             <div className="grid gap-6 md:grid-cols-2 text-xs text-slate-400">
-              {/* Left column: trade meta */}
+              {/* Left column: entry/exit price, contracts, PnL */}
               <div className="space-y-2">
-                {/* Side + Contracts */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Side / Contracts:</span>
-                  {editMode ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={draftSide ?? ""}
-                        onChange={(e) =>
-                          setDraftSide(
-                            (e.target.value || null) as TradeSide | null
-                          )
-                        }
-                        className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                      >
-                        <option value="">—</option>
-                        <option value="buy">Buy</option>
-                        <option value="sell">Sell</option>
-                      </select>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={draftContracts}
-                        onChange={(e) => setDraftContracts(e.target.value)}
-                        className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                        placeholder="#"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.side ? trade.side.toUpperCase() : "—"}
-                      {" · "}
-                      {trade.contracts != null ? `${trade.contracts} contracts` : "—"}
-                    </span>
-                  )}
-                </div>
-
                 {/* Entry / Exit price */}
                 <div className="flex items-center justify-between gap-3">
                   <span>Entry / Exit price:</span>
@@ -620,6 +737,43 @@ function TradeDetailPage() {
                   )}
                 </div>
 
+                {/* Contracts */}
+                <div className="flex items-center justify-between gap-3">
+                  <span>Contracts:</span>
+                  {editMode ? (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={draftSide ?? ""}
+                        onChange={(e) =>
+                          setDraftSide(
+                            (e.target.value || null) as TradeSide | null
+                          )
+                        }
+                        className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                      >
+                        <option value="">Side —</option>
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={draftContracts}
+                        onChange={(e) => setDraftContracts(e.target.value)}
+                        className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                        placeholder="#"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-slate-200">
+                      {trade.contracts != null
+                        ? `${trade.contracts} contracts`
+                        : "—"}
+                    </span>
+                  )}
+                </div>
+
                 {/* PnL */}
                 <div className="flex items-center justify-between gap-3">
                   <span>PnL:</span>
@@ -637,23 +791,69 @@ function TradeDetailPage() {
                       className={
                         trade.pnl != null && trade.pnl >= 0
                           ? "text-emerald-400"
-                          : 
-                          trade.pnl != null
+                          : trade.pnl != null
                           ? "text-rose-400"
                           : "text-slate-200"
                       }
                     >
-                      {trade.pnl != null
-                        ? `$${trade.pnl.toFixed(2)}`
-                        : "—"}
+                      {trade.pnl != null ? `$${trade.pnl.toFixed(2)}` : "—"}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right column: symbol, session + edit-only side/outcome */}
+              <div className="space-y-2">
+                {/* Symbol */}
+                <div className="flex items-center justify-between gap-3">
+                  <span>Symbol:</span>
+                  {editMode ? (
+                    <input
+                      type="text"
+                      value={draftSymbol}
+                      onChange={(e) =>
+                        setDraftSymbol(e.target.value.toUpperCase())
+                      }
+                      className="w-32 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                      placeholder="e.g. MNQ"
+                    />
+                  ) : (
+                    <span className="text-slate-200">
+                      {trade.symbol ?? "—"}
                     </span>
                   )}
                 </div>
 
-                {/* Outcome */}
+                {/* Session (read-only – inferred) */}
                 <div className="flex items-center justify-between gap-3">
-                  <span>Outcome:</span>
-                  {editMode ? (
+                  <span>Session:</span>
+                  <span className="text-slate-200">{trade.session ?? "—"}</span>
+                </div>
+
+                {/* Side – edit only (view is handled by tag) */}
+                {editMode && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Side:</span>
+                    <select
+                      value={draftSide ?? ""}
+                      onChange={(e) =>
+                        setDraftSide(
+                          (e.target.value || null) as TradeSide | null
+                        )
+                      }
+                      className="w-32 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                    >
+                      <option value="">—</option>
+                      <option value="buy">Buy</option>
+                      <option value="sell">Sell</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Outcome – edit only (view handled by pill) */}
+                {editMode && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Outcome:</span>
                     <select
                       value={draftOutcome ?? ""}
                       onChange={(e) =>
@@ -669,125 +869,113 @@ function TradeDetailPage() {
                       <option value="breakeven">Breakeven</option>
                       <option value="early_exit">Early exit</option>
                     </select>
-                  ) : (
-                    <span
-                      className={
-                        trade.outcome === "win"
-                          ? "text-emerald-400"
-                          : trade.outcome === "loss"
-                          ? "text-rose-400"
-                          : "text-slate-200"
-                      }
-                    >
-                      {trade.outcome ?? "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* R multiple */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>R multiple:</span>
-                  {editMode ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={draftRMultiple}
-                      onChange={(e) => setDraftRMultiple(e.target.value)}
-                      className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                      placeholder="e.g. 1.50"
-                    />
-                  ) : (
-                    <span
-                      className={
-                        trade.r_multiple != null && trade.r_multiple >= 0
-                          ? "text-emerald-400"
-                          : trade.r_multiple != null
-                          ? "text-rose-400"
-                          : "text-slate-200"
-                      }
-                    >
-                      {trade.r_multiple != null
-                        ? `${trade.r_multiple.toFixed(2)}R`
-                        : "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Strategy */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Strategy:</span>
-                  {editMode ? (
-                    <input
-                      type="text"
-                      value={draftStrategy}
-                      onChange={(e) => setDraftStrategy(e.target.value)}
-                      className="w-40 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                      placeholder="e.g. FVG, Liquidity Grab"
-                    />
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.strategy ?? "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Session (read-only – inferred) */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Session:</span>
-                  <span className="text-slate-200">{trade.session ?? "—"}</span>
-                </div>
-              </div>
-
-              {/* Right column: timing */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-300 font-medium">Timing</span>
-                  {editMode && (
-                    <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
-                      Local time
-                    </span>
-                  )}
-                </div>
-
-                {/* Entry */}
-                <div className="flex flex-col gap-1">
-                  <span>Entry:</span>
-                  {editMode ? (
-                    <input
-                      type="datetime-local"
-                      value={draftTakenAt}
-                      onChange={(e) => setDraftTakenAt(e.target.value)}
-                      className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                    />
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.taken_at
-                        ? new Date(trade.taken_at).toLocaleString()
-                        : "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Exit */}
-                <div className="flex flex-col gap-1">
-                  <span>Exit:</span>
-                  {editMode ? (
-                    <input
-                      type="datetime-local"
-                      value={draftExitAt}
-                      onChange={(e) => setDraftExitAt(e.target.value)}
-                      className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                    />
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.exit_at
-                        ? new Date(trade.exit_at).toLocaleString()
-                        : "—"}
-                    </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Strategies row – full width, edit-only control */}
+            {editMode && (
+              <div className="mt-4 space-y-2 text-xs text-slate-400">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-300 font-medium text-xs">
+                      Strategies
+                    </span>
+                    <OverviewTagPill className="border-slate-600 text-slate-300">
+                      Tag each setup
+                    </OverviewTagPill>
+                  </div>
+                  {draftStrategies.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDraftStrategies([])}
+                      className="text-[10px] text-slate-400 hover:text-red-300"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {/* Input + + button */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="relative w-full sm:max-w-md">
+                      <input
+                        type="text"
+                        value={strategyInput}
+                        onChange={(e) => setStrategyInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault()
+                            handleAddStrategy(strategyInput)
+                          }
+                        }}
+                        placeholder="Type to search or create e.g. 20 EMA Bounce"
+                        className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 pr-10 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddStrategy(strategyInput)}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-xs font-bold text-slate-900 hover:bg-teal-400 disabled:opacity-40"
+                        disabled={!strategyInput.trim()}
+                        aria-label="Add strategy"
+                      >
+                        +
+                      </button>
+
+                      {/* Suggestions dropdown */}
+                      {filteredSuggestions.length > 0 && (
+                        <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 text-xs shadow-lg">
+                          {filteredSuggestions.map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => handleAddStrategy(s)}
+                              className="flex w-full items-center justify-between px-2 py-1 text-left text-slate-200 hover:bg-slate-800"
+                            >
+                              <span>{s}</span>
+                              <span className="text-[10px] text-slate-400">
+                                Tap to add
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Selected strategy pills */}
+                  {draftStrategies.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {draftStrategies.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => handleRemoveStrategy(s)}
+                          className="group inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[11px] text-slate-100 hover:border-teal-500 hover:bg-slate-800"
+                        >
+                          <span className="truncate max-w-[10rem]">{s}</span>
+                          <span className="text-[10px] text-slate-500 group-hover:text-teal-300">
+                            ✕
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {effectiveStrategies.length > 0 && (
+              <div className="mt-4 border-t border-slate-800 pt-3 text-xs text-slate-300">
+                <span className="font-medium text-slate-200">
+                  Strategies used:
+                </span>{" "}
+                <span className="break-words">
+                  {effectiveStrategies.join(", ")}
+                </span>
+              </div>
+            )}
           </section>
 
           {/* Images */}
@@ -796,9 +984,9 @@ function TradeDetailPage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-medium text-slate-100">Images</h2>
                 {editMode && images.length > 0 && (
-                  <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
                     Tap ✕ to remove
-                  </span>
+                  </OverviewTagPill>
                 )}
               </div>
 
@@ -820,7 +1008,7 @@ function TradeDetailPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {images.map((img, i) => {
-                  const isSelected = img.id && img.id === selectedImageId;
+                  const isSelected = img.id && img.id === selectedImageId
 
                   return (
                     <div
@@ -852,8 +1040,8 @@ function TradeDetailPage() {
                         <button
                           type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteImage(img);
+                            e.stopPropagation()
+                            handleDeleteImage(img)
                           }}
                           disabled={deletingImageId === img.id}
                           className="absolute right-3 top-3 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
@@ -878,27 +1066,26 @@ function TradeDetailPage() {
                         </button>
                       )}
                     </div>
-                  );
+                  )
                 })}
               </div>
             )}
           </section>
 
-          {/* Note*/}
+          {/* Note */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <div className="mb-2 flex items-center gap-2">
               <h2 className="text-lg font-medium text-slate-100">Note</h2>
               {editMode && (
-                <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                <OverviewTagPill className="border-teal-500/40 text-teal-300">
                   Editing
-                </span>
+                </OverviewTagPill>
               )}
             </div>
 
             {editMode ? (
-              <textarea
+              <AutoResizeTextarea
                 value={draftNote}
-                onInput={handleInput}
                 onChange={(e) => setDraftNote(e.target.value)}
                 rows={4}
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
@@ -916,9 +1103,9 @@ function TradeDetailPage() {
             <div className="mb-2 flex items-center gap-2">
               <h2 className="text-lg font-medium text-slate-100">Mistakes</h2>
               {editMode && (
-                <span className="rounded-full border border-teal-500/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-300">
+                <OverviewTagPill className="border-teal-500/40 text-teal-300">
                   Editing
-                </span>
+                </OverviewTagPill>
               )}
             </div>
 
@@ -927,13 +1114,13 @@ function TradeDetailPage() {
                 <p className="text-xs text-slate-400">
                   One per line. These will be saved as individual mistakes.
                 </p>
-                <textarea
+                <AutoResizeTextarea
                   value={draftMistakes}
-                  onInput={handleInput}
                   onChange={(e) => setDraftMistakes(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none"
+                  rows={4}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
                   placeholder={
-                    "e.g.\nChased price into resistance\nIgnored 5m EMA context"
+                    "Entered too early\nDidn’t wait for EMA alignment"
                   }
                 />
               </div>
@@ -1035,55 +1222,17 @@ function TradeDetailPage() {
       )}
 
       {/* Lightbox */}
-      {isOpen && images.length > 0 && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-          onClick={close}
-        >
-          <div
-            className="relative mx-4 w-full max-w-5xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={imgUrl(images[index].s3_key, { w: 1920 })}
-              alt={`Screenshot ${index + 1}`}
-              className="max-h-[85vh] w-full object-contain"
-            />
-            <button
-              onClick={close}
-              className="absolute right-2 top-2 rounded-full bg-slate-900/70 px-3 py-1 text-slate-200 hover:bg-slate-900"
-              aria-label="Close"
-            >
-              x
-            </button>
-
-            {images.length > 1 && (
-              <>
-                <button
-                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-slate-200 hover:bg-slate-900"
-                  aria-label="Previous"
-                  onClick={prev}
-                >
-                  ‹
-                </button>
-
-                <button
-                  onClick={next}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-slate-200 hover:bg-slate-900"
-                  aria-label="Next"
-                >
-                  ›
-                </button>
-                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-xs text-slate-200">
-                  {index + 1} / {images.length}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <ImageLightbox
+        images={lightboxImages}
+        index={index}
+        isOpen={isOpen}
+        onClose={close}
+        onPrev={prev}
+        onNext={next}
+        srcBuilder={(s3Key) => imgUrl(s3Key, { w: 1920 })}
+      />
     </div>
-  );
+  )
 }
 
 export default function Page() {
@@ -1091,5 +1240,5 @@ export default function Page() {
     <Suspense fallback={<Fallback />}>
       <TradeDetailPage />
     </Suspense>
-  );
+  )
 }

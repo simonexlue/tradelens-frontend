@@ -5,11 +5,10 @@ import TradeCard from "@/components/TradeCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
-import type {
-  TradeListItem,
-  TradeOutcome,
-  Session,
-} from "@/types/trades";
+import type { TradeListItem, TradeOutcome, Session } from "@/types/trades";
+
+import { ActiveFilters } from "@/components/filters/ActiveFilters";
+import { FilterGroup } from "@/components/filters/FilterGroup";
 
 type PageResp = { items: TradeListItem[]; nextCursor: string | null };
 
@@ -17,6 +16,7 @@ type FilterState = {
   outcomes: TradeOutcome[];
   sessions: Session[];
   strategies: string[];
+  symbols: string[];
 };
 
 const OUTCOME_LABELS: Record<TradeOutcome, string> = {
@@ -32,6 +32,8 @@ const SESSION_LABELS: Record<Session, string> = {
   Break: "Break",
   Asia: "Asia",
 };
+
+const PAGE_LIMIT = 10;
 
 async function fetchTrades(opts: {
   limit: number;
@@ -55,6 +57,7 @@ export default function TradesListClient() {
     outcomes: [],
     sessions: [],
     strategies: [],
+    symbols: [],
   });
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,12 +71,20 @@ export default function TradesListClient() {
     const outcomeSet = new Set<TradeOutcome>();
     const sessionSet = new Set<Session>();
     const strategySet = new Set<string>();
+    const symbolSet = new Set<string>();
 
     for (const t of items) {
       if (t.outcome) outcomeSet.add(t.outcome);
       if (t.session) sessionSet.add(t.session);
-      if (t.strategy && t.strategy.trim() !== "") {
-        strategySet.add(t.strategy.trim());
+      if (Array.isArray(t.strategies)) {
+        for (const raw of t.strategies) {
+          const s = raw?.trim();
+          if (s) strategySet.add(s);
+        }
+      }
+
+      if (t.symbol && t.symbol.trim() !== "") {
+        symbolSet.add(t.symbol.trim().toUpperCase());
       }
     }
 
@@ -81,13 +92,15 @@ export default function TradesListClient() {
       outcomes: Array.from(outcomeSet),
       sessions: Array.from(sessionSet),
       strategies: Array.from(strategySet),
+      symbols: Array.from(symbolSet),
     };
   }, [items]);
 
   const hasActiveFilters =
     filters.outcomes.length > 0 ||
     filters.sessions.length > 0 ||
-    filters.strategies.length > 0;
+    filters.strategies.length > 0 ||
+    filters.symbols.length > 0;
 
   const filteredItems = useMemo(() => {
     if (!hasActiveFilters) return items;
@@ -101,11 +114,21 @@ export default function TradesListClient() {
         filters.sessions.length === 0 ||
         (t.session && filters.sessions.includes(t.session));
 
+      // Trade matches if ANY of its strategies is in the active filter list
       const matchStrategy =
         filters.strategies.length === 0 ||
-        (t.strategy && filters.strategies.includes(t.strategy.trim()));
+        (Array.isArray(t.strategies) &&
+          t.strategies.some((raw) => {
+            const s = raw?.trim();
+            return s && filters.strategies.includes(s);
+          }));
 
-      return matchOutcome && matchSession && matchStrategy;
+      const matchSymbol =
+        filters.symbols.length === 0 ||
+        (t.symbol &&
+          filters.symbols.includes(t.symbol.trim().toUpperCase()));
+
+      return matchOutcome && matchSession && matchStrategy && matchSymbol;
     });
   }, [items, filters, hasActiveFilters]);
 
@@ -151,6 +174,19 @@ export default function TradesListClient() {
       });
     }
 
+    // Symbols
+    for (const sym of filters.symbols) {
+      pills.push({
+        key: `symbol-${sym}`,
+        label: sym,
+        onClick: () =>
+          setFilters((prev) => ({
+            ...prev,
+            symbols: prev.symbols.filter((x) => x !== sym),
+          })),
+      });
+    }
+
     return pills;
   }, [filters]);
 
@@ -159,7 +195,7 @@ export default function TradesListClient() {
       setLoading(true);
       setError(null);
       const { items: newItems, nextCursor } = await fetchTrades({
-        limit: 10,
+        limit: PAGE_LIMIT,
         cursor: initial ? null : cursor,
       });
       setItems((prev) => (initial ? newItems : [...prev, ...newItems]));
@@ -199,7 +235,8 @@ export default function TradesListClient() {
       {/* Filters wrapper */}
       {(filterOptions.outcomes.length > 0 ||
         filterOptions.sessions.length > 0 ||
-        filterOptions.strategies.length > 0) && (
+        filterOptions.strategies.length > 0 ||
+        filterOptions.symbols.length > 0) && (
         <section className="mb-4">
           {/* Header row: title + chevron + active pills + clear button */}
           <div className="mb-2 flex items-center justify-between">
@@ -219,27 +256,19 @@ export default function TradesListClient() {
               </button>
 
               {/* Active filter pills outside the box */}
-              {activeFilterPills.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {activeFilterPills.map((pill) => (
-                    <button
-                      key={pill.key}
-                      type="button"
-                      onClick={pill.onClick}
-                      className="rounded-full border border-teal-500/60 bg-teal-500/10 px-3 py-0.5 text-xs text-teal-200 hover:bg-teal-500/20"
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <ActiveFilters pills={activeFilterPills} />
             </div>
 
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={() =>
-                  setFilters({ outcomes: [], sessions: [], strategies: [] })
+                  setFilters({
+                    outcomes: [],
+                    sessions: [],
+                    strategies: [],
+                    symbols: [],
+                  })
                 }
                 className="text-xs text-slate-400 hover:text-teal-300"
               >
@@ -252,107 +281,63 @@ export default function TradesListClient() {
           {filtersOpen && (
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
               <div className="space-y-3 text-xs">
-                {/* Outcome group */}
-                {filterOptions.outcomes.length > 0 && (
-                  <div>
-                    <p className="mb-1 text-slate-400">Outcome</p>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.outcomes.map((o) => {
-                        const active = filters.outcomes.includes(o);
-                        return (
-                          <button
-                            key={o}
-                            type="button"
-                            onClick={() =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                outcomes: active
-                                  ? prev.outcomes.filter((x) => x !== o)
-                                  : [...prev.outcomes, o],
-                              }))
-                            }
-                            className={[
-                              "rounded-full px-3 py-1 border text-xs transition",
-                              active
-                                ? "border-teal-500 bg-teal-500/20 text-teal-200"
-                                : "border-slate-700 bg-slate-800 text-slate-300 hover:border-teal-500/60",
-                            ].join(" ")}
-                          >
-                            {OUTCOME_LABELS[o]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <FilterGroup<TradeOutcome>
+                  title="Outcome"
+                  options={filterOptions.outcomes}
+                  activeValues={filters.outcomes}
+                  labelMap={OUTCOME_LABELS}
+                  onToggle={(o) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      outcomes: prev.outcomes.includes(o)
+                        ? prev.outcomes.filter((x) => x !== o)
+                        : [...prev.outcomes, o],
+                    }))
+                  }
+                />
 
-                {/* Session group */}
-                {filterOptions.sessions.length > 0 && (
-                  <div>
-                    <p className="mb-1 text-slate-400">Session</p>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.sessions.map((s) => {
-                        const active = filters.sessions.includes(s);
-                        return (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={() =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                sessions: active
-                                  ? prev.sessions.filter((x) => x !== s)
-                                  : [...prev.sessions, s],
-                              }))
-                            }
-                            className={[
-                              "rounded-full px-3 py-1 border text-xs transition",
-                              active
-                                ? "border-teal-500 bg-teal-500/20 text-teal-200"
-                                : "border-slate-700 bg-slate-800 text-slate-300 hover:border-teal-500/60",
-                            ].join(" ")}
-                          >
-                            {SESSION_LABELS[s]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <FilterGroup<Session>
+                  title="Session"
+                  options={filterOptions.sessions}
+                  activeValues={filters.sessions}
+                  labelMap={SESSION_LABELS}
+                  onToggle={(s) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      sessions: prev.sessions.includes(s)
+                        ? prev.sessions.filter((x) => x !== s)
+                        : [...prev.sessions, s],
+                    }))
+                  }
+                />
 
-                {/* Strategy group */}
-                {filterOptions.strategies.length > 0 && (
-                  <div>
-                    <p className="mb-1 text-slate-400">Strategy</p>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.strategies.map((strat) => {
-                        const active = filters.strategies.includes(strat);
-                        return (
-                          <button
-                            key={strat}
-                            type="button"
-                            onClick={() =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                strategies: active
-                                  ? prev.strategies.filter((x) => x !== strat)
-                                  : [...prev.strategies, strat],
-                              }))
-                            }
-                            className={[
-                              "rounded-full px-3 py-1 border text-xs transition",
-                              active
-                                ? "border-teal-500 bg-teal-500/20 text-teal-200"
-                                : "border-slate-700 bg-slate-800 text-slate-300 hover:border-teal-500/60",
-                            ].join(" ")}
-                          >
-                            {strat}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <FilterGroup<string>
+                  title="Strategy"
+                  options={filterOptions.strategies}
+                  activeValues={filters.strategies}
+                  onToggle={(strat) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      strategies: prev.strategies.includes(strat)
+                        ? prev.strategies.filter((x) => x !== strat)
+                        : [...prev.strategies, strat],
+                    }))
+                  }
+                />
+
+                <FilterGroup<string>
+                  title="Symbol"
+                  options={filterOptions.symbols}
+                  activeValues={filters.symbols}
+                  onToggle={(sym) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      symbols: prev.symbols.includes(sym)
+                        ? prev.symbols.filter((x) => x !== sym)
+                        : [...prev.symbols, sym],
+                    }))
+                  }
+                />
               </div>
             </div>
           )}
@@ -378,11 +363,12 @@ export default function TradesListClient() {
       </div>
 
       <div className="mt-6 flex justify-center">
-        {cursor && (
-          <Button disabled={loading} onClick={() => loadMore(false)}>
-            {loading ? "Loading..." : "Load more"}
-          </Button>
-        )}
+        {cursor &&
+          (!hasActiveFilters || filteredItems.length >= PAGE_LIMIT) && (
+            <Button disabled={loading} onClick={() => loadMore(false)}>
+              {loading ? "Loading..." : "Load more"}
+            </Button>
+          )}
       </div>
     </div>
   );
