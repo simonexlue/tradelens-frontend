@@ -5,32 +5,13 @@ import TradeCard from "@/components/TradeCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
-import type { TradeListItem, TradeOutcome, Session } from "@/types/trades";
+import type { TradeListItem, TradeOutcome, Session, FetchTradesOpts } from "@/types/trades";
+import type { FilterState, FilterOptions } from "@/types/filters";
 
 import { ActiveFilters } from "@/components/filters/ActiveFilters";
 import { FilterGroup } from "@/components/filters/FilterGroup";
 
 type PageResp = { items: TradeListItem[]; nextCursor: string | null };
-
-type FilterState = {
-  outcomes: TradeOutcome[];
-  sessions: Session[];
-  strategies: string[];
-  symbols: string[];
-};
-
-type FetchTradesOpts = {
-  limit: number;
-  cursor: string | null;
-  filters: FilterState;
-};
-
-type FilterOptions = {
-  outcomes: TradeOutcome[];
-  sessions: Session[];
-  strategies: string[];
-  symbols: string[];
-}
 
 const OUTCOME_LABELS: Record<TradeOutcome, string> = {
   win: "Win",

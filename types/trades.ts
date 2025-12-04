@@ -1,3 +1,5 @@
+import { FilterState } from "@/types/filters";
+
 export type TradeOutcome = "win" | "loss" | "breakeven" | "early_exit";
 export type Session = "London" | "NY" | "Break" | "Asia";
 export type TradeSide = "buy" | "sell";
@@ -81,4 +83,10 @@ export type CreateTradePayload = {
   contracts?: number;
   pnl?: number;
   symbol?: string;
+};
+
+export type FetchTradesOpts = {
+  limit: number;
+  cursor: string | null;
+  filters: FilterState;
 };
