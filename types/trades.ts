@@ -22,6 +22,9 @@ export type TradeListItem = {
   note: string | null;
   created_at: string;
   taken_at: string | null;
+  outcome: "win" | "loss" | "breakeven" | "early_exit" | null
+  session: "London" | "NY" | "Break" | "Asia" | null
+  strategy: string | null
   images: { s3_key: string; width?: number; height?: number }[]; // thumbnail only
   image_count: number;
 };
