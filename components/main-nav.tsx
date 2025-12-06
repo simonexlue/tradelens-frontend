@@ -8,7 +8,6 @@ import {
   ChartCandlestick,
   Menu,
   Plus,
-  Settings as SettingsIcon,
   X,
 } from "lucide-react"
 import icon from "public/favicon.png"
