@@ -180,15 +180,6 @@ export default function TradesListClient() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <Link href="/trades-new">
-          <Button className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900" size="sm">
-            New Trade
-          </Button>
-        </Link>
-      </div>
-
       {/* Error */}
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-red-300">

@@ -516,9 +516,6 @@ function TradeDetailPage() {
           >
             ← Back
           </button>
-          <h1 className="text-xl font-semibold text-slate-100">
-            Trade Details
-          </h1>
 
           {/* Main edit toggle beside title */}
           {trade && !loading && (

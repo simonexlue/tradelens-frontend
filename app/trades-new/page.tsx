@@ -347,19 +347,7 @@ function NewTradePageInner() {
   const isAddImageMode = !!existingTradeId
 
   return (
-    <div className="mx-auto max-w-2xl p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.back()}
-          className="rounded-xl border border-slate-800 px-2 py-1 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
-        >
-          ← Back
-        </button>
-        <h1 className="text-xl font-semibold text-slate-100">
-          {isAddImageMode ? "Add Image to Trade" : "New Trade"}
-        </h1>
-      </div>
-
+    <div className="w-full">
       {error && (
         <div className="rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
           {error}
@@ -559,7 +547,7 @@ function NewTradePageInner() {
         ref={dropRef}
         onDrop={onDrop}
         onDragOver={onDragOver}
-        className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
+        className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
       >
         <p className="mb-4">
           {isAddImageMode
@@ -593,7 +581,7 @@ function NewTradePageInner() {
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="mt-6 flex justify-end">
         <button
           onClick={handleUpload}
           disabled={isUploading || !file}
