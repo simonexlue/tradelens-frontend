@@ -351,11 +351,11 @@ function NewTradePageInner() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="rounded-2xl border border-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
+          className="rounded-xl border border-slate-800 px-2 py-1 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
         >
           ← Back
         </button>
-        <h1 className="text-2xl font-semibold text-slate-100">
+        <h1 className="text-xl font-semibold text-slate-100">
           {isAddImageMode ? "Add Image to Trade" : "New Trade"}
         </h1>
       </div>

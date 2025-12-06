@@ -182,9 +182,8 @@ export default function TradesListClient() {
     <div>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-100">My Trades</h1>
         <Link href="/trades-new">
-          <Button className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900">
+          <Button className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900" size="sm">
             New Trade
           </Button>
         </Link>

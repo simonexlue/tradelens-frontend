@@ -82,6 +82,6 @@
 
 @layer components {
   .page-shell {
-    @apply mx-8 md:mx-8 xl:mx-20 py-6;
+    @apply ml-16 pl-6 pr-8 xl:pr-20;
   }
 }
