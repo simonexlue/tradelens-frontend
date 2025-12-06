@@ -39,6 +39,8 @@ const SIDE_LABELS: Record<TradeSide, string> = {
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
+type EditingSection = "overview" | "images" | "note" | "mistakes" | null
+
 function OverviewTagPill({
   children,
   className = "",
@@ -161,9 +163,16 @@ function TradeDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Global edit mode for all sections (except AI analysis)
-  const [editMode, setEditMode] = useState(false)
-  const [saving, setSaving] = useState(false)
+  // Section-level edit & save state
+  const [editingSection, setEditingSection] = useState<EditingSection>(null)
+  const [savingSection, setSavingSection] = useState<
+    "overview" | "note" | "mistakes" | null
+  >(null)
+
+  const isOverviewEditing = editingSection === "overview"
+  const isImagesEditing = editingSection === "images"
+  const isNoteEditing = editingSection === "note"
+  const isMistakesEditing = editingSection === "mistakes"
 
   // Drafts for fields while editing
   const [draftNote, setDraftNote] = useState<string>("")
@@ -270,6 +279,24 @@ function TradeDetailPage() {
     )
   }
 
+  function beginEditing(section: EditingSection) {
+    if (!trade) return
+    // re-sync drafts from current trade whenever we enter edit
+    if (section === "overview" || section === "note" || section === "mistakes") {
+      hydrateDrafts(trade)
+    }
+    setStrategyInput("")
+    setEditingSection(section)
+  }
+
+  function cancelEditing() {
+    if (trade) {
+      hydrateDrafts(trade)
+    }
+    setStrategyInput("")
+    setEditingSection(null)
+  }
+
   useEffect(() => {
     // load strategy history once
     ;(async () => {
@@ -291,7 +318,7 @@ function TradeDetailPage() {
     setAnalysis(null)
     setAnalysisError(null)
     setSelectedImageId(null)
-    setEditMode(false) // reset mode when switching trades
+    setEditingSection(null)
     ;(async () => {
       try {
         setLoading(true)
@@ -320,15 +347,10 @@ function TradeDetailPage() {
     })()
   }, [tradeId])
 
-  async function handleSaveAll() {
+  async function handleSaveOverview() {
     if (!tradeId) return
 
-    // Parse mistakes from text area (one per line, ignore empty)
-    const mistakeArray =
-      draftMistakes
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean) ?? []
+    // Parse mistakes are not part of overview save
 
     // Convert datetime-local -> ISO for backend (or null)
     const takenAtIso =
@@ -377,14 +399,12 @@ function TradeDetailPage() {
     }
 
     try {
-      setSaving(true)
+      setSavingSection("overview")
       const updated = await updateTrade(tradeId, {
-        note: draftNote,
         takenAt: takenAtIso,
         exitAt: exitAtIso,
         outcome: draftOutcome ?? null,
         strategies: draftStrategies, // always array (can be empty to clear)
-        mistakes: mistakeArray,
         side: draftSide ?? null,
         entryPrice: entryPriceValue ?? null,
         exitPrice: exitPriceValue ?? null,
@@ -394,23 +414,56 @@ function TradeDetailPage() {
       })
       setTrade(updated)
       hydrateDrafts(updated)
-      setEditMode(false)
+      setEditingSection(null)
     } catch (e: any) {
       console.error(e)
-      alert(e?.message || "Error saving trade details")
+      alert(e?.message || "Error saving overview")
     } finally {
-      setSaving(false)
+      setSavingSection(null)
     }
   }
 
-  function handleCancelAll() {
-    if (!trade) {
-      setEditMode(false)
-      return
+  async function handleSaveNote() {
+    if (!tradeId) return
+    try {
+      setSavingSection("note")
+      const updated = await updateTrade(tradeId, {
+        note: draftNote,
+      })
+      setTrade(updated)
+      hydrateDrafts(updated)
+      setEditingSection(null)
+    } catch (e: any) {
+      console.error(e)
+      alert(e?.message || "Error saving note")
+    } finally {
+      setSavingSection(null)
     }
-    hydrateDrafts(trade)
-    setStrategyInput("")
-    setEditMode(false)
+  }
+
+  async function handleSaveMistakes() {
+    if (!tradeId) return
+
+    const mistakeArray =
+      draftMistakes
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean) ?? []
+
+    try {
+      setSavingSection("mistakes")
+      const updated = await updateTrade(tradeId, {
+        mistakes: mistakeArray,
+      })
+      setTrade(updated)
+      hydrateDrafts(updated)
+      setEditingSection(null)
+    } catch (e: any) {
+      console.error(e)
+      alert(e?.message || "Error saving mistakes")
+    } finally {
+      setSavingSection(null)
+    }
   }
 
   async function handleDeleteImage(image: ImageRec) {
@@ -456,7 +509,6 @@ function TradeDetailPage() {
   }
 
   const open = (i: number) => {
-    if (editMode) return // don't open lightbox in edit mode
     setIndex(i)
     setIsOpen(true)
   }
@@ -516,43 +568,6 @@ function TradeDetailPage() {
           >
             ← Back
           </button>
-
-          {/* Main edit toggle beside title */}
-          {trade && !loading && (
-            <>
-              {!editMode ? (
-                <button
-                  onClick={() => {
-                    if (!trade) return
-                    hydrateDrafts(trade)
-                    setEditMode(true)
-                  }}
-                  className="text-slate-400 hover:text-teal-400"
-                  aria-label="Edit trade"
-                >
-                  <Pencil size={18} />
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleSaveAll}
-                    disabled={saving}
-                    className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
-                    aria-label="Save changes"
-                  >
-                    <Check size={18} />
-                  </button>
-                  <button
-                    onClick={handleCancelAll}
-                    className="text-red-400 hover:text-red-300"
-                    aria-label="Cancel editing"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              )}
-            </>
-          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -596,17 +611,51 @@ function TradeDetailPage() {
         <div className="space-y-8">
           {/* Overview */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-lg font-medium text-slate-100">Overview</h2>
-              {editMode && (
-                <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                  Editing
-                </OverviewTagPill>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-medium text-slate-100">Overview</h2>
+                {isOverviewEditing && (
+                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
+                    Editing
+                  </OverviewTagPill>
+                )}
+              </div>
+
+              {trade && !loading && (
+                <>
+                  {!isOverviewEditing ? (
+                    <button
+                      onClick={() => beginEditing("overview")}
+                      className="text-slate-400 hover:text-teal-400"
+                      aria-label="Edit overview"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveOverview}
+                        disabled={savingSection === "overview"}
+                        className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
+                        aria-label="Save overview"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={cancelEditing}
+                        className="text-red-400 hover:text-red-300"
+                        aria-label="Cancel editing overview"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Tag row: symbol/outcome/session/side/strategies */}
-            {!editMode && (
+            {!isOverviewEditing && (
               <div className="mb-3 flex flex-wrap gap-2 text-[10px]">
                 {/* Symbol pill */}
                 {trade.symbol && trade.symbol.trim() !== "" && (
@@ -660,14 +709,14 @@ function TradeDetailPage() {
             {/* Timing – full width */}
             <div className="mb-4 space-y-1 text-xs text-slate-400">
               <div className="flex items-center gap-2">
-                {editMode && (
+                {isOverviewEditing && (
                   <OverviewTagPill className="border-teal-500/40 text-teal-300">
                     Local time
                   </OverviewTagPill>
                 )}
               </div>
 
-              {editMode ? (
+              {isOverviewEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="datetime-local"
@@ -703,7 +752,7 @@ function TradeDetailPage() {
                 {/* Entry / Exit price */}
                 <div className="flex items-center justify-between gap-3">
                   <span>Entry / Exit price:</span>
-                  {editMode ? (
+                  {isOverviewEditing ? (
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -739,7 +788,7 @@ function TradeDetailPage() {
                 {/* Contracts */}
                 <div className="flex items-center justify-between gap-3">
                   <span>Contracts:</span>
-                  {editMode ? (
+                  {isOverviewEditing ? (
                     <div className="flex items-center gap-2">
                       <select
                         value={draftSide ?? ""}
@@ -776,7 +825,7 @@ function TradeDetailPage() {
                 {/* PnL */}
                 <div className="flex items-center justify-between gap-3">
                   <span>PnL:</span>
-                  {editMode ? (
+                  {isOverviewEditing ? (
                     <input
                       type="number"
                       step="0.01"
@@ -806,7 +855,7 @@ function TradeDetailPage() {
                 {/* Symbol */}
                 <div className="flex items-center justify-between gap-3">
                   <span>Symbol:</span>
-                  {editMode ? (
+                  {isOverviewEditing ? (
                     <input
                       type="text"
                       value={draftSymbol}
@@ -830,7 +879,7 @@ function TradeDetailPage() {
                 </div>
 
                 {/* Side – edit only (view is handled by tag) */}
-                {editMode && (
+                {isOverviewEditing && (
                   <div className="flex items-center justify-between gap-3">
                     <span>Side:</span>
                     <select
@@ -850,7 +899,7 @@ function TradeDetailPage() {
                 )}
 
                 {/* Outcome – edit only (view handled by pill) */}
-                {editMode && (
+                {isOverviewEditing && (
                   <div className="flex items-center justify-between gap-3">
                     <span>Outcome:</span>
                     <select
@@ -874,7 +923,7 @@ function TradeDetailPage() {
             </div>
 
             {/* Strategies row – full width, edit-only control */}
-            {editMode && (
+            {isOverviewEditing && (
               <div className="mt-4 space-y-2 text-xs text-slate-400">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -965,6 +1014,7 @@ function TradeDetailPage() {
                 </div>
               </div>
             )}
+
             {effectiveStrategies.length > 0 && (
               <div className="mt-4 border-t border-slate-800 pt-3 text-xs text-slate-300">
                 <span className="font-medium text-slate-200">
@@ -982,7 +1032,7 @@ function TradeDetailPage() {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-medium text-slate-100">Images</h2>
-                {editMode && images.length > 0 && (
+                {isImagesEditing && images.length > 0 && (
                   <OverviewTagPill className="border-teal-500/40 text-teal-300">
                     Tap ✕ to remove
                   </OverviewTagPill>
@@ -993,6 +1043,27 @@ function TradeDetailPage() {
                 <span className="text-xs text-slate-400">
                   {images.length} {images.length === 1 ? "image" : "images"}
                 </span>
+                {images.length > 0 && (
+                  <>
+                    {!isImagesEditing ? (
+                      <button
+                        onClick={() => beginEditing("images")}
+                        className="text-slate-400 hover:text-teal-400"
+                        aria-label="Toggle image delete mode"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setEditingSection(null)}
+                        className="text-red-400 hover:text-red-300"
+                        aria-label="Exit image delete mode"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -1014,16 +1085,15 @@ function TradeDetailPage() {
                       key={img.id ?? img.s3_key}
                       className={`relative flex flex-col rounded-2xl border bg-slate-950/40
                         ${
-                          isSelected && !editMode
+                          isSelected && !isImagesEditing
                             ? "border-teal-500 ring-2 ring-teal-500/60"
                             : "border-slate-800 hover:border-teal-500/40"
                         }`}
                     >
-                      {/* Image area (click = preview only) */}
+                      {/* Image area (click = preview) */}
                       <button
                         type="button"
                         onClick={() => open(i)}
-                        disabled={editMode}
                         className="flex-1 overflow-hidden rounded-t-2xl"
                       >
                         <img
@@ -1034,8 +1104,8 @@ function TradeDetailPage() {
                         />
                       </button>
 
-                      {/* Delete button in edit mode */}
-                      {editMode && (
+                      {/* Delete button in image edit mode */}
+                      {isImagesEditing && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1049,8 +1119,8 @@ function TradeDetailPage() {
                         </button>
                       )}
 
-                      {/* AI selection footer bar (only when not editing) */}
-                      {!editMode && (
+                      {/* AI selection footer bar (only when not in delete mode) */}
+                      {!isImagesEditing && (
                         <button
                           type="button"
                           onClick={() => img.id && setSelectedImageId(img.id)}
@@ -1073,16 +1143,52 @@ function TradeDetailPage() {
 
           {/* Note */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 className="text-lg font-medium text-slate-100">Note</h2>
-              {editMode && (
-                <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                  Editing
-                </OverviewTagPill>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-medium text-slate-100">Note</h2>
+                {isNoteEditing && (
+                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
+                    Editing
+                  </OverviewTagPill>
+                )}
+              </div>
+
+           
+
+              {trade && !loading && (
+                <>
+                  {!isNoteEditing ? (
+                    <button
+                      onClick={() => beginEditing("note")}
+                      className="text-slate-400 hover:text-teal-400"
+                      aria-label="Edit note"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveNote}
+                        disabled={savingSection === "note"}
+                        className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
+                        aria-label="Save note"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={cancelEditing}
+                        className="text-red-400 hover:text-red-300"
+                        aria-label="Cancel editing note"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            {editMode ? (
+            {isNoteEditing ? (
               <AutoResizeTextarea
                 value={draftNote}
                 onChange={(e) => setDraftNote(e.target.value)}
@@ -1099,16 +1205,52 @@ function TradeDetailPage() {
 
           {/* Mistakes */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 className="text-lg font-medium text-slate-100">Mistakes</h2>
-              {editMode && (
-                <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                  Editing
-                </OverviewTagPill>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-medium text-slate-100">
+                  Mistakes
+                </h2>
+                {isMistakesEditing && (
+                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
+                    Editing
+                  </OverviewTagPill>
+                )}
+              </div>
+
+              {trade && !loading && (
+                <>
+                  {!isMistakesEditing ? (
+                    <button
+                      onClick={() => beginEditing("mistakes")}
+                      className="text-slate-400 hover:text-teal-400"
+                      aria-label="Edit mistakes"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveMistakes}
+                        disabled={savingSection === "mistakes"}
+                        className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
+                        aria-label="Save mistakes"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={cancelEditing}
+                        className="text-red-400 hover:text-red-300"
+                        aria-label="Cancel editing mistakes"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            {editMode ? (
+            {isMistakesEditing ? (
               <div className="space-y-1">
                 <p className="text-xs text-slate-400">
                   One per line. These will be saved as individual mistakes.
@@ -1131,12 +1273,13 @@ function TradeDetailPage() {
               </ul>
             ) : (
               <p className="text-xs text-slate-400">
-                No mistakes logged yet. Toggle edit and add some for journaling.
+                No mistakes logged yet. Tap the pencil to add some for
+                journaling.
               </p>
             )}
           </section>
 
-          {/* Analysis (not affected by main edit mode) */}
+          {/* Analysis (not affected by edit sections) */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-slate-100">Analysis</h2>
