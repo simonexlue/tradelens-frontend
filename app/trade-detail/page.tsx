@@ -2,7 +2,6 @@
 
 import { ReactNode, Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Check, Pencil, X } from "lucide-react"
 
 import type {
   ImageRec,
@@ -13,52 +12,20 @@ import type {
   TradeSide,
   UpdateTradePayload,
 } from "@/types/trades"
-import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea"
-import { ImageLightbox } from "@/components/ui/ImageLightbox"
 import { Button } from "@/components/ui/button"
+import { ImageLightbox } from "@/components/ui/ImageLightbox"
 
-const OUTCOME_LABELS: Record<TradeOutcome, string> = {
-  win: "Win",
-  loss: "Loss",
-  breakeven: "Break Even",
-  early_exit: "Early Exit",
-}
-
-const SESSION_LABELS: Record<Session, string> = {
-  London: "London",
-  NY: "New York",
-  Break: "Break",
-  Asia: "Asia",
-}
-
-const SIDE_LABELS: Record<TradeSide, string> = {
-  buy: "Long",
-  sell: "Short",
-}
+import { TradeOverviewSection } from "@/components/trades/TradeOverviewSection"
+import { TradeImagesSection } from "@/components/trades/TradeImageSection"
+import { TradeNoteSection } from "@/components/trades/TradeNoteSection"
+import { TradeMistakesSection } from "@/components/trades/TradeMistakesSection"
+import { TradeAnalysisSection } from "@/components/trades/TradeAnalysisSection"
 
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
 type EditingSection = "overview" | "images" | "note" | "mistakes" | null
-
-function OverviewTagPill({
-  children,
-  className = "",
-}: {
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <span
-      className={[
-        "rounded-full border px-2 py-0.5 text-[10px]",
-        className,
-      ].join(" ")}
-    >
-      {children}
-    </span>
-  )
-}
+type SavingSection = "overview" | "note" | "mistakes" | null
 
 function imgUrl(s3Key: string, q?: Record<string, string | number>) {
   const qs = q
@@ -165,37 +132,31 @@ function TradeDetailPage() {
 
   // Section-level edit & save state
   const [editingSection, setEditingSection] = useState<EditingSection>(null)
-  const [savingSection, setSavingSection] = useState<
-    "overview" | "note" | "mistakes" | null
-  >(null)
+  const [savingSection, setSavingSection] = useState<SavingSection>(null)
 
   const isOverviewEditing = editingSection === "overview"
   const isImagesEditing = editingSection === "images"
   const isNoteEditing = editingSection === "note"
   const isMistakesEditing = editingSection === "mistakes"
 
-  // Drafts for fields while editing
+  // Drafts
   const [draftNote, setDraftNote] = useState<string>("")
   const [draftOutcome, setDraftOutcome] = useState<TradeOutcome | null>(null)
   const [draftStrategies, setDraftStrategies] = useState<string[]>([])
   const [draftMistakes, setDraftMistakes] = useState<string>("")
   const [draftSymbol, setDraftSymbol] = useState<string>("")
 
-  // entry/exit times (datetime-local strings)
   const [draftTakenAt, setDraftTakenAt] = useState<string>("")
   const [draftExitAt, setDraftExitAt] = useState<string>("")
 
-  // overview meta
   const [draftSide, setDraftSide] = useState<TradeSide | null>(null)
   const [draftEntryPrice, setDraftEntryPrice] = useState<string>("")
   const [draftExitPrice, setDraftExitPrice] = useState<string>("")
   const [draftContracts, setDraftContracts] = useState<string>("")
   const [draftPnl, setDraftPnl] = useState<string>("")
 
-  // Image delete state
+  // Images
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
-
-  // Trade delete
   const [deletingTrade, setDeletingTrade] = useState(false)
 
   // Lightbox
@@ -208,7 +169,7 @@ function TradeDetailPage() {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
 
-  // Strategy history + input
+  // Strategies list + input
   const [allStrategies, setAllStrategies] = useState<string[]>([])
   const [strategyInput, setStrategyInput] = useState<string>("")
 
@@ -248,13 +209,9 @@ function TradeDetailPage() {
     setDraftEntryPrice(
       from.entry_price != null ? from.entry_price.toString() : ""
     )
-
     setDraftExitPrice(from.exit_price != null ? from.exit_price.toString() : "")
-
     setDraftContracts(from.contracts != null ? from.contracts.toString() : "")
-
     setDraftPnl(from.pnl != null ? from.pnl.toString() : "")
-
     setDraftSymbol(from.symbol ?? "")
   }
 
@@ -281,7 +238,6 @@ function TradeDetailPage() {
 
   function beginEditing(section: EditingSection) {
     if (!trade) return
-    // re-sync drafts from current trade whenever we enter edit
     if (section === "overview" || section === "note" || section === "mistakes") {
       hydrateDrafts(trade)
     }
@@ -298,7 +254,6 @@ function TradeDetailPage() {
   }
 
   useEffect(() => {
-    // load strategy history once
     ;(async () => {
       try {
         const history = await fetchStrategies()
@@ -326,10 +281,8 @@ function TradeDetailPage() {
         setTrade(data)
         hydrateDrafts(data)
 
-        // Auto-select first image if available
         if (data.images && data.images.length > 0 && data.images[0].id) {
           setSelectedImageId(data.images[0].id)
-
           if (data.analysis) {
             setAnalysis({
               what_happened: data.analysis.what_happened,
@@ -350,15 +303,11 @@ function TradeDetailPage() {
   async function handleSaveOverview() {
     if (!tradeId) return
 
-    // Parse mistakes are not part of overview save
-
-    // Convert datetime-local -> ISO for backend (or null)
     const takenAtIso =
       draftTakenAt.trim() !== "" ? new Date(draftTakenAt).toISOString() : null
     const exitAtIso =
       draftExitAt.trim() !== "" ? new Date(draftExitAt).toISOString() : null
 
-    // parse numeric meta
     const parseNumberField = (
       raw: string,
       label: string
@@ -394,7 +343,6 @@ function TradeDetailPage() {
 
       pnlValue = parseNumberField(draftPnl, "PnL")
     } catch {
-      // parseNumberField already alerted
       return
     }
 
@@ -404,7 +352,7 @@ function TradeDetailPage() {
         takenAt: takenAtIso,
         exitAt: exitAtIso,
         outcome: draftOutcome ?? null,
-        strategies: draftStrategies, // always array (can be empty to clear)
+        strategies: draftStrategies,
         side: draftSide ?? null,
         entryPrice: entryPriceValue ?? null,
         exitPrice: exitPriceValue ?? null,
@@ -468,7 +416,6 @@ function TradeDetailPage() {
 
   async function handleDeleteImage(image: ImageRec) {
     if (!tradeId) return
-
     if (!image.id) {
       alert("Cannot delete this image: missing image id from backend.")
       return
@@ -496,7 +443,6 @@ function TradeDetailPage() {
           : prev
       )
 
-      // If we deleted the currently-selected image, clear or pick another
       setSelectedImageId((prevSelected) =>
         prevSelected === image.id ? null : prevSelected
       )
@@ -547,8 +493,6 @@ function TradeDetailPage() {
     try {
       setDeletingTrade(true)
       await deleteTradeApi(tradeId)
-
-      // After success
       router.push("/trades-list")
     } catch (e: any) {
       console.error(e)
@@ -556,6 +500,8 @@ function TradeDetailPage() {
       setDeletingTrade(false)
     }
   }
+
+  const thumbUrl = (s3Key: string) => imgUrl(s3Key, { fit: "thumb" })
 
   return (
     <div>
@@ -609,757 +555,86 @@ function TradeDetailPage() {
       {/* Content */}
       {trade && !loading && (
         <div className="space-y-8">
-          {/* Overview */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-medium text-slate-100">Overview</h2>
-                {isOverviewEditing && (
-                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                    Editing
-                  </OverviewTagPill>
-                )}
-              </div>
+          <TradeOverviewSection
+            trade={trade}
+            isEditing={isOverviewEditing}
+            saving={savingSection === "overview"}
+            onEdit={() => beginEditing("overview")}
+            onCancel={cancelEditing}
+            onSave={handleSaveOverview}
+            draftTakenAt={draftTakenAt}
+            setDraftTakenAt={setDraftTakenAt}
+            draftExitAt={draftExitAt}
+            setDraftExitAt={setDraftExitAt}
+            draftEntryPrice={draftEntryPrice}
+            setDraftEntryPrice={setDraftEntryPrice}
+            draftExitPrice={draftExitPrice}
+            setDraftExitPrice={setDraftExitPrice}
+            draftContracts={draftContracts}
+            setDraftContracts={setDraftContracts}
+            draftPnl={draftPnl}
+            setDraftPnl={setDraftPnl}
+            draftSymbol={draftSymbol}
+            setDraftSymbol={setDraftSymbol}
+            draftOutcome={draftOutcome}
+            setDraftOutcome={setDraftOutcome}
+            draftSide={draftSide}
+            setDraftSide={setDraftSide}
+            draftStrategies={draftStrategies}
+            setDraftStrategies={setDraftStrategies}
+            strategyInput={strategyInput}
+            setStrategyInput={setStrategyInput}
+            filteredSuggestions={filteredSuggestions}
+            effectiveStrategies={effectiveStrategies}
+            onAddStrategy={handleAddStrategy}
+            onRemoveStrategy={handleRemoveStrategy}
+          />
 
-              {trade && !loading && (
-                <>
-                  {!isOverviewEditing ? (
-                    <button
-                      onClick={() => beginEditing("overview")}
-                      className="text-slate-400 hover:text-teal-400"
-                      aria-label="Edit overview"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleSaveOverview}
-                        disabled={savingSection === "overview"}
-                        className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
-                        aria-label="Save overview"
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={cancelEditing}
-                        className="text-red-400 hover:text-red-300"
-                        aria-label="Cancel editing overview"
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+          <TradeImagesSection
+            images={images}
+            isEditing={isImagesEditing}
+            onEnterEdit={() => beginEditing("images")}
+            onExitEdit={() => setEditingSection(null)}
+            selectedImageId={selectedImageId}
+            setSelectedImageId={setSelectedImageId}
+            deletingImageId={deletingImageId}
+            onDeleteImage={handleDeleteImage}
+            openLightbox={open}
+            getThumbUrl={thumbUrl}
+          />
 
-            {/* Tag row: symbol/outcome/session/side/strategies */}
-            {!isOverviewEditing && (
-              <div className="mb-3 flex flex-wrap gap-2 text-[10px]">
-                {/* Symbol pill */}
-                {trade.symbol && trade.symbol.trim() !== "" && (
-                  <OverviewTagPill className="border-amber-500/60 bg-amber-500/10 text-amber-200">
-                    {trade.symbol}
-                  </OverviewTagPill>
-                )}
+          <TradeNoteSection
+            trade={trade}
+            isEditing={isNoteEditing}
+            saving={savingSection === "note"}
+            onEdit={() => beginEditing("note")}
+            onCancel={cancelEditing}
+            onSave={handleSaveNote}
+            draftNote={draftNote}
+            setDraftNote={setDraftNote}
+          />
 
-                {/* Outcome pill */}
-                {trade.outcome && (
-                  <OverviewTagPill
-                    className={
-                      trade.outcome === "win"
-                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                        : trade.outcome === "loss"
-                        ? "border-rose-500/60 bg-rose-500/15 text-rose-300"
-                        : "border-slate-600 bg-slate-800/80 text-slate-200"
-                    }
-                  >
-                    {OUTCOME_LABELS[trade.outcome]}
-                  </OverviewTagPill>
-                )}
+          <TradeMistakesSection
+            trade={trade}
+            isEditing={isMistakesEditing}
+            saving={savingSection === "mistakes"}
+            onEdit={() => beginEditing("mistakes")}
+            onCancel={cancelEditing}
+            onSave={handleSaveMistakes}
+            draftMistakes={draftMistakes}
+            setDraftMistakes={setDraftMistakes}
+          />
 
-                {/* Session pill */}
-                {trade.session && (
-                  <OverviewTagPill className="border-slate-600 bg-slate-800/80 text-slate-200">
-                    {SESSION_LABELS[trade.session]}
-                  </OverviewTagPill>
-                )}
-
-                {/* Side pill */}
-                {trade.side && (
-                  <OverviewTagPill className="border-sky-500/60 bg-sky-500/15 text-sky-200">
-                    {SIDE_LABELS[trade.side]}
-                  </OverviewTagPill>
-                )}
-
-                {/* Strategy pills (multiple) */}
-                {effectiveStrategies.length > 0 &&
-                  effectiveStrategies.map((s) => (
-                    <OverviewTagPill
-                      key={s}
-                      className="max-w-[14rem] truncate border-teal-500/60 bg-teal-500/10 text-teal-200"
-                    >
-                      {s}
-                    </OverviewTagPill>
-                  ))}
-              </div>
-            )}
-
-            {/* Timing – full width */}
-            <div className="mb-4 space-y-1 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                {isOverviewEditing && (
-                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                    Local time
-                  </OverviewTagPill>
-                )}
-              </div>
-
-              {isOverviewEditing ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="datetime-local"
-                    value={draftTakenAt}
-                    onChange={(e) => setDraftTakenAt(e.target.value)}
-                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                  />
-                  <span className="text-slate-500">→</span>
-                  <input
-                    type="datetime-local"
-                    value={draftExitAt}
-                    onChange={(e) => setDraftExitAt(e.target.value)}
-                    className="w-full max-w-xs rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                  />
-                </div>
-              ) : (
-                <span className="text-slate-200">
-                  {trade.taken_at
-                    ? new Date(trade.taken_at).toLocaleString()
-                    : "—"}
-                  {" → "}
-                  {trade.exit_at
-                    ? new Date(trade.exit_at).toLocaleString()
-                    : "—"}
-                </span>
-              )}
-            </div>
-
-            {/* Meta grid */}
-            <div className="grid gap-6 md:grid-cols-2 text-xs text-slate-400">
-              {/* Left column: entry/exit price, contracts, PnL */}
-              <div className="space-y-2">
-                {/* Entry / Exit price */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Entry / Exit price:</span>
-                  {isOverviewEditing ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={draftEntryPrice}
-                        onChange={(e) => setDraftEntryPrice(e.target.value)}
-                        className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                        placeholder="Entry"
-                      />
-                      <span className="text-slate-500">→</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={draftExitPrice}
-                        onChange={(e) => setDraftExitPrice(e.target.value)}
-                        className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                        placeholder="Exit"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.entry_price != null
-                        ? trade.entry_price.toFixed(2)
-                        : "—"}
-                      {" → "}
-                      {trade.exit_price != null
-                        ? trade.exit_price.toFixed(2)
-                        : "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Contracts */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Contracts:</span>
-                  {isOverviewEditing ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={draftSide ?? ""}
-                        onChange={(e) =>
-                          setDraftSide(
-                            (e.target.value || null) as TradeSide | null
-                          )
-                        }
-                        className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                      >
-                        <option value="">Side —</option>
-                        <option value="buy">Buy</option>
-                        <option value="sell">Sell</option>
-                      </select>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={draftContracts}
-                        onChange={(e) => setDraftContracts(e.target.value)}
-                        className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                        placeholder="#"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.contracts != null
-                        ? `${trade.contracts} contracts`
-                        : "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* PnL */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>PnL:</span>
-                  {isOverviewEditing ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={draftPnl}
-                      onChange={(e) => setDraftPnl(e.target.value)}
-                      className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                      placeholder="PnL ($)"
-                    />
-                  ) : (
-                    <span
-                      className={
-                        trade.pnl != null && trade.pnl >= 0
-                          ? "text-emerald-400"
-                          : trade.pnl != null
-                          ? "text-rose-400"
-                          : "text-slate-200"
-                      }
-                    >
-                      {trade.pnl != null ? `$${trade.pnl.toFixed(2)}` : "—"}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Right column: symbol, session + edit-only side/outcome */}
-              <div className="space-y-2">
-                {/* Symbol */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Symbol:</span>
-                  {isOverviewEditing ? (
-                    <input
-                      type="text"
-                      value={draftSymbol}
-                      onChange={(e) =>
-                        setDraftSymbol(e.target.value.toUpperCase())
-                      }
-                      className="w-32 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                      placeholder="e.g. MNQ"
-                    />
-                  ) : (
-                    <span className="text-slate-200">
-                      {trade.symbol ?? "—"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Session (read-only – inferred) */}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Session:</span>
-                  <span className="text-slate-200">{trade.session ?? "—"}</span>
-                </div>
-
-                {/* Side – edit only (view is handled by tag) */}
-                {isOverviewEditing && (
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Side:</span>
-                    <select
-                      value={draftSide ?? ""}
-                      onChange={(e) =>
-                        setDraftSide(
-                          (e.target.value || null) as TradeSide | null
-                        )
-                      }
-                      className="w-32 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                    >
-                      <option value="">—</option>
-                      <option value="buy">Buy</option>
-                      <option value="sell">Sell</option>
-                    </select>
-                  </div>
-                )}
-
-                {/* Outcome – edit only (view handled by pill) */}
-                {isOverviewEditing && (
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Outcome:</span>
-                    <select
-                      value={draftOutcome ?? ""}
-                      onChange={(e) =>
-                        setDraftOutcome(
-                          (e.target.value || null) as TradeOutcome | null
-                        )
-                      }
-                      className="w-40 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
-                    >
-                      <option value="">—</option>
-                      <option value="win">Win</option>
-                      <option value="loss">Loss</option>
-                      <option value="breakeven">Breakeven</option>
-                      <option value="early_exit">Early exit</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Strategies row – full width, edit-only control */}
-            {isOverviewEditing && (
-              <div className="mt-4 space-y-2 text-xs text-slate-400">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-300 font-medium text-xs">
-                      Strategies
-                    </span>
-                    <OverviewTagPill className="border-slate-600 text-slate-300">
-                      Tag each setup
-                    </OverviewTagPill>
-                  </div>
-                  {draftStrategies.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setDraftStrategies([])}
-                      className="text-[10px] text-slate-400 hover:text-red-300"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {/* Input + + button */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <div className="relative w-full sm:max-w-md">
-                      <input
-                        type="text"
-                        value={strategyInput}
-                        onChange={(e) => setStrategyInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault()
-                            handleAddStrategy(strategyInput)
-                          }
-                        }}
-                        placeholder="Type to search or create e.g. 20 EMA Bounce"
-                        className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 pr-10 text-xs text-slate-100 focus:border-teal-500 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleAddStrategy(strategyInput)}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-xs font-bold text-slate-900 hover:bg-teal-400 disabled:opacity-40"
-                        disabled={!strategyInput.trim()}
-                        aria-label="Add strategy"
-                      >
-                        +
-                      </button>
-
-                      {/* Suggestions dropdown */}
-                      {filteredSuggestions.length > 0 && (
-                        <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 text-xs shadow-lg">
-                          {filteredSuggestions.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={() => handleAddStrategy(s)}
-                              className="flex w-full items-center justify-between px-2 py-1 text-left text-slate-200 hover:bg-slate-800"
-                            >
-                              <span>{s}</span>
-                              <span className="text-[10px] text-slate-400">
-                                Tap to add
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Selected strategy pills */}
-                  {draftStrategies.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {draftStrategies.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => handleRemoveStrategy(s)}
-                          className="group inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[11px] text-slate-100 hover:border-teal-500 hover:bg-slate-800"
-                        >
-                          <span className="truncate max-w-[10rem]">{s}</span>
-                          <span className="text-[10px] text-slate-500 group-hover:text-teal-300">
-                            ✕
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {effectiveStrategies.length > 0 && (
-              <div className="mt-4 border-t border-slate-800 pt-3 text-xs text-slate-300">
-                <span className="font-medium text-slate-200">
-                  Strategies used:
-                </span>{" "}
-                <span className="break-words">
-                  {effectiveStrategies.join(", ")}
-                </span>
-              </div>
-            )}
-          </section>
-
-          {/* Images */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-medium text-slate-100">Images</h2>
-                {isImagesEditing && images.length > 0 && (
-                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                    Tap ✕ to remove
-                  </OverviewTagPill>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-400">
-                  {images.length} {images.length === 1 ? "image" : "images"}
-                </span>
-                {images.length > 0 && (
-                  <>
-                    {!isImagesEditing ? (
-                      <button
-                        onClick={() => beginEditing("images")}
-                        className="text-slate-400 hover:text-teal-400"
-                        aria-label="Toggle image delete mode"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setEditingSection(null)}
-                        className="text-red-400 hover:text-red-300"
-                        aria-label="Exit image delete mode"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {images.length === 0 ? (
-              <p className="text-sm text-slate-400">
-                No images yet. Use{" "}
-                <span className="font-medium">
-                  &quot;Upload another image&quot;
-                </span>{" "}
-                to add screenshots.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {images.map((img, i) => {
-                  const isSelected = img.id && img.id === selectedImageId
-
-                  return (
-                    <div
-                      key={img.id ?? img.s3_key}
-                      className={`relative flex flex-col rounded-2xl border bg-slate-950/40
-                        ${
-                          isSelected && !isImagesEditing
-                            ? "border-teal-500 ring-2 ring-teal-500/60"
-                            : "border-slate-800 hover:border-teal-500/40"
-                        }`}
-                    >
-                      {/* Image area (click = preview) */}
-                      <button
-                        type="button"
-                        onClick={() => open(i)}
-                        className="flex-1 overflow-hidden rounded-t-2xl"
-                      >
-                        <img
-                          src={imgUrl(img.s3_key, { fit: "thumb" })}
-                          alt={`Screenshot ${i + 1}`}
-                          loading="lazy"
-                          className="h-full w-full object-cover transition-transform hover:scale-[1.02]"
-                        />
-                      </button>
-
-                      {/* Delete button in image edit mode */}
-                      {isImagesEditing && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteImage(img)
-                          }}
-                          disabled={deletingImageId === img.id}
-                          className="absolute right-3 top-3 rounded-full bg-red-900/80 px-2 py-1 text-xs text-red-100 hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {deletingImageId === img.id ? "…" : "✕"}
-                        </button>
-                      )}
-
-                      {/* AI selection footer bar (only when not in delete mode) */}
-                      {!isImagesEditing && (
-                        <button
-                          type="button"
-                          onClick={() => img.id && setSelectedImageId(img.id)}
-                          className={`w-full text-xs py-1.5 rounded-b-2xl font-medium border-t transition
-                            ${
-                              isSelected
-                                ? "bg-teal-500 text-slate-900 border-teal-500"
-                                : "bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700"
-                            }`}
-                        >
-                          {isSelected ? "Selected for AI" : "Use for AI"}
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Note */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-medium text-slate-100">Note</h2>
-                {isNoteEditing && (
-                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                    Editing
-                  </OverviewTagPill>
-                )}
-              </div>
-
-           
-
-              {trade && !loading && (
-                <>
-                  {!isNoteEditing ? (
-                    <button
-                      onClick={() => beginEditing("note")}
-                      className="text-slate-400 hover:text-teal-400"
-                      aria-label="Edit note"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleSaveNote}
-                        disabled={savingSection === "note"}
-                        className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
-                        aria-label="Save note"
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={cancelEditing}
-                        className="text-red-400 hover:text-red-300"
-                        aria-label="Cancel editing note"
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {isNoteEditing ? (
-              <AutoResizeTextarea
-                value={draftNote}
-                onChange={(e) => setDraftNote(e.target.value)}
-                rows={4}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
-                placeholder="What happened on this trade?"
-              />
-            ) : (
-              <p className="mt-1 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                {trade.note?.trim() || "(no notes)"}
-              </p>
-            )}
-          </section>
-
-          {/* Mistakes */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-medium text-slate-100">
-                  Mistakes
-                </h2>
-                {isMistakesEditing && (
-                  <OverviewTagPill className="border-teal-500/40 text-teal-300">
-                    Editing
-                  </OverviewTagPill>
-                )}
-              </div>
-
-              {trade && !loading && (
-                <>
-                  {!isMistakesEditing ? (
-                    <button
-                      onClick={() => beginEditing("mistakes")}
-                      className="text-slate-400 hover:text-teal-400"
-                      aria-label="Edit mistakes"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleSaveMistakes}
-                        disabled={savingSection === "mistakes"}
-                        className="text-teal-400 hover:text-teal-300 disabled:opacity-50"
-                        aria-label="Save mistakes"
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={cancelEditing}
-                        className="text-red-400 hover:text-red-300"
-                        aria-label="Cancel editing mistakes"
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {isMistakesEditing ? (
-              <div className="space-y-1">
-                <p className="text-xs text-slate-400">
-                  One per line. These will be saved as individual mistakes.
-                </p>
-                <AutoResizeTextarea
-                  value={draftMistakes}
-                  onChange={(e) => setDraftMistakes(e.target.value)}
-                  rows={4}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-200 focus:border-teal-500 focus:outline-none"
-                  placeholder={
-                    "Entered too early\nDidn’t wait for EMA alignment"
-                  }
-                />
-              </div>
-            ) : trade.mistakes && trade.mistakes.length > 0 ? (
-              <ul className="mt-2 list-disc pl-5 space-y-1 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                {trade.mistakes.map((m, i) => (
-                  <li key={i}>{m}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-slate-400">
-                No mistakes logged yet. Tap the pencil to add some for
-                journaling.
-              </p>
-            )}
-          </section>
-
-          {/* Analysis (not affected by edit sections) */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-slate-100">Analysis</h2>
-              <Button
-                size="sm"
-                onClick={handleRunAnalysis}
-                disabled={
-                  !tradeId ||
-                  !selectedImageId ||
-                  analysisLoading ||
-                  images.length === 0
-                }
-                className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900 disabled:opacity-60"
-              >
-                {analysisLoading
-                  ? "Analyzing…"
-                  : selectedImageId
-                  ? "Run AI Analysis"
-                  : "Select a screenshot"}
-              </Button>
-            </div>
-
-            {analysisError && (
-              <div className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-sm text-red-300">
-                {analysisError}
-              </div>
-            )}
-
-            {analysisLoading && (
-              <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-sm text-slate-300">
-                Analyzing this trade setup… This may take a few seconds.
-              </div>
-            )}
-
-            {!analysis && !analysisLoading && (
-              <div className="rounded-lg border border-slate-800 bg-slate-800/30 p-4 text-slate-400 text-sm">
-                No analysis yet. Select a screenshot above and click{" "}
-                <span className="font-medium text-teal-300">
-                  Run AI Analysis
-                </span>{" "}
-                to generate:
-                <ul className="mt-2 list-disc pl-5">
-                  <li>What happened</li>
-                  <li>Why it worked / failed</li>
-                  <li>2–3 tips to improve next time</li>
-                </ul>
-              </div>
-            )}
-
-            {analysis && !analysisLoading && (
-              <div className="space-y-4 text-sm text-slate-200">
-                <div>
-                  <h3 className="text-base font-semibold text-[#18B6B2]">
-                    What happened
-                  </h3>
-                  <p className="mt-1 text-slate-200">
-                    {analysis.what_happened}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-semibold text-[#18B6B2]">
-                    Why it worked / failed
-                  </h3>
-                  <p className="mt-1 text-slate-200">{analysis.why_result}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-semibold text-[#18B6B2]">
-                    Tips for next time
-                  </h3>
-                  <ul className="mt-1 list-disc pl-5 space-y-1">
-                    {analysis.tips.map((tip, i) => (
-                      <li key={i}>{tip}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </section>
+          <TradeAnalysisSection
+            tradeId={tradeId ?? null}
+            images={images}
+            selectedImageId={selectedImageId}
+            setSelectedImageId={setSelectedImageId}
+            analysis={analysis}
+            analysisError={analysisError}
+            analysisLoading={analysisLoading}
+            onRunAnalysis={handleRunAnalysis}
+          />
         </div>
       )}
 
