@@ -33,7 +33,7 @@ const MONTH_NAMES = [
 
 async function fetchCalendar(
   year: number,
-  month: number,
+  month: number, // 1-12
   filters: FilterState
 ): Promise<CalendarResponse> {
   const qs = new URLSearchParams({
@@ -57,12 +57,12 @@ async function fetchCalendar(
 export function TradeCalendar({ filters }: TradeCalendarProps) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  const [month, setMonth] = useState(today.getMonth()) // 0-11
+
   const [days, setDays] = useState<CalendarDaySummary[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch calendar whenever date filters change
   useEffect(() => {
     ;(async () => {
       try {
@@ -88,8 +88,9 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
 
   const cells = useMemo(() => {
     const firstOfMonth = new Date(year, month, 1)
-    const firstWeekday = firstOfMonth.getDay() // 0 = sunday
+    const firstWeekday = firstOfMonth.getDay() // 0=Sun
     const daysInMonth = new Date(year, month + 1, 0).getDate()
+
     const result: { date: Date | null }[] = []
 
     for (let i = 0; i < firstWeekday; i++) {
@@ -98,7 +99,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
     for (let d = 1; d <= daysInMonth; d++) {
       result.push({ date: new Date(year, month, d) })
     }
-    while (result.length < 42) {
+    while (result.length % 7 !== 0) {
       result.push({ date: null })
     }
 
@@ -158,7 +159,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
               onClick={goToPrevYear}
               className="p-1 hover:text-teal-300"
             >
-              <ChevronLeft size={14} />
+              <ChevronsLeft size={14} />
             </button>
             <button
               type="button"
@@ -167,11 +168,9 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
             >
               <ChevronLeft size={14} />
             </button>
-
             <span className="px-2 text-xs font-medium text-slate-100">
               {MONTH_NAMES[month]} {year}
             </span>
-
             <button
               type="button"
               onClick={goToNextMonth}
@@ -184,7 +183,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
               onClick={goToNextYear}
               className="p-1 hover:text-teal-300"
             >
-              <ChevronRight size={14} />
+              <ChevronsRight size={14} />
             </button>
           </div>
 
@@ -199,7 +198,6 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
         </div>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
           {error}
@@ -213,7 +211,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
       ) : (
         <>
           {/* Weekday header */}
-          <div className="mb-2 grid grid-cols-7 text-center text-[11px] font-medium text-slate-400">
+          <div className="mb-2 grid grid-cols-7 text-center text-[10px] sm:text-[11px] font-medium text-slate-400">
             <span>Sun</span>
             <span>Mon</span>
             <span>Tue</span>
@@ -230,7 +228,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
                 return (
                   <div
                     key={idx}
-                    className="min-h-[80px] rounded-xl border border-slate-800 bg-slate-900/60"
+                    className="aspect-square rounded-xl border border-slate-800 bg-slate-900/60"
                   />
                 )
               }
@@ -239,11 +237,10 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
               const key = d.toISOString().slice(0, 10)
               const summary = dayMap.get(key)
 
-              // Adjust property names if your /types/calendar.ts uses something different
               const pnl = summary?.pnl ?? 0
               const tradeCount =
-                (summary as any)?.tradeCount ??
                 (summary as any)?.trade_count ??
+                (summary as any)?.tradeCount ??
                 0
 
               let bgClasses =
@@ -259,36 +256,44 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
                   "border-slate-600/50 bg-slate-800/80 hover:border-teal-300/70"
               }
 
+              // Format PnL
+              const absPnl = Math.abs(pnl)
+              const pnlText =
+                pnl < 0 ? `-$${absPnl.toFixed(2)}` : `$${absPnl.toFixed(2)}`
+
+              const pnlColorClass =
+                pnl > 0
+                  ? "text-emerald-300"
+                  : pnl < 0
+                  ? "text-red-300"
+                  : "text-slate-300"
+
               return (
                 <div
                   key={idx}
-                  className={`flex min-h-[80px] flex-col justify-between rounded-xl border px-2 py-1 transition ${bgClasses}`}
+                  className={`flex aspect-square flex-col rounded-xl border px-2 py-1 transition ${bgClasses}`}
                 >
-                  <div className="flex justify-between text-[11px] text-slate-300">
-                    <span>{d.getDate()}</span>
-                    {tradeCount > 0 && (
-                      <span className="text-[10px] text-slate-300">
-                        {tradeCount} trade{tradeCount !== 1 ? "s" : ""}
-                      </span>
-                    )}
+                  {/* Date */}
+                  <div className="text-[10px] sm:text-[11px] text-slate-300">
+                    {d.getDate()}
                   </div>
 
-                  {tradeCount > 0 && (
-                    <div className="pb-1 text-xs font-semibold">
-                      <span
-                        className={
-                          pnl > 0
-                            ? "text-emerald-300"
-                            : pnl < 0
-                            ? "text-red-300"
-                            : "text-slate-300"
-                        }
-                      >
-                        {pnl > 0 ? "+" : ""}
-                        {pnl.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
+                  {/* PnL + trade count */}
+                  <div className="flex flex-1 flex-col items-center justify-center gap-1">
+                    {tradeCount > 0 && (
+                      <>
+                        <span
+                          className={`font-semibold ${pnlColorClass} text-[11px] sm:text-xs`}
+                        >
+                          {pnlText}
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] text-slate-200">
+                          {tradeCount} trade
+                          {tradeCount !== 1 ? "s" : ""}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               )
             })}
