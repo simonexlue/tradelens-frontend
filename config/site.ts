@@ -6,6 +6,10 @@ export const siteConfig = {
     "AI Trading Journal to level up your edge.",
   mainNav: [
     {
+      title: "Dashboard",
+      href: "/"
+    },
+    {
       title: "Trades List",
       href: "/trades-list",
     },

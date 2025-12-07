@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { ChevronDown } from "lucide-react"
 
 import type { FilterOptions, FilterState } from "@/types/filters"
@@ -15,7 +14,6 @@ import { Button } from "@/components/ui/button"
 import TradeCard from "@/components/TradeCard"
 import { ActiveFilters } from "@/components/filters/ActiveFilters"
 import { FilterGroup } from "@/components/filters/FilterGroup"
-import { TradeCalendar } from "@/components/trades/calendar/TradeCalendar"
 
 type PageResp = { items: TradeListItem[]; nextCursor: string | null }
 
@@ -57,7 +55,6 @@ export default function TradesListClient() {
   const [items, setItems] = useState<TradeListItem[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid")
   const [filters, setFilters] = useState<FilterState>({
     outcomes: [],
     sessions: [],
@@ -191,7 +188,7 @@ export default function TradesListClient() {
         </div>
       )}
 
-      {loading && items.length === 0 && viewMode === "grid" && (
+      {loading && items.length === 0 && (
         <div className="flex w-full justify-center py-20">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-400 border-t-transparent" />
         </div>
@@ -223,32 +220,6 @@ export default function TradesListClient() {
 
               {/* Active filter pills outside the box */}
               <ActiveFilters pills={activeFilterPills} />
-            </div>
-
-            {/* View toggle */}
-            <div className="inline-flex rounded-full bg-slate-900/80 p-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode("grid")}
-                className={`px-3 py-1 rounded-full transition ${
-                  viewMode === "grid"
-                    ? "bg-teal-500 text-slate-900"
-                    : "text-slate-300 hover:text-teal-300"
-                }`}
-              >
-                Grid
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("calendar")}
-                className={`px-3 py-1 rounded-full transition ${
-                  viewMode === "calendar"
-                    ? "bg-teal-500 text-slate-900"
-                    : "text-slate-300 hover:text-teal-300"
-                }`}
-              >
-                Calendar
-              </button>
             </div>
           </div>
 
@@ -338,37 +309,30 @@ export default function TradesListClient() {
       )}
 
       {/* GRID VIEW */}
-      {viewMode === "grid" && (
-        <>
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
-            {items.map((t) => {
-              const firstKey = t.images?.[0]?.s3_key ?? null
-              const entryTime = t.taken_at ?? t.created_at
-              return (
-                <TradeCard
-                  key={t.id}
-                  id={t.id}
-                  note={t.note}
-                  created_at={entryTime}
-                  thumbnail_s3_key={firstKey}
-                  image_count={t.image_count}
-                />
-              )
-            })}
-          </div>
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
+        {items.map((t) => {
+          const firstKey = t.images?.[0]?.s3_key ?? null
+          const entryTime = t.taken_at ?? t.created_at
+          return (
+            <TradeCard
+              key={t.id}
+              id={t.id}
+              note={t.note}
+              created_at={entryTime}
+              thumbnail_s3_key={firstKey}
+              image_count={t.image_count}
+            />
+          )
+        })}
+      </div>
 
-          <div className="mt-6 flex justify-center">
-            {cursor && (
-              <Button disabled={loading} onClick={() => loadMore(false)}>
-                {loading ? "Loading..." : "Load more"}
-              </Button>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* CALENDAR VIEW */}
-      {viewMode === "calendar" && <TradeCalendar filters={filters} />}
+      <div className="mt-6 flex justify-center">
+        {cursor && (
+          <Button disabled={loading} onClick={() => loadMore(false)}>
+            {loading ? "Loading..." : "Load more"}
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

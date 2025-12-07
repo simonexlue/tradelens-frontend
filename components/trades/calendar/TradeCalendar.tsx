@@ -191,7 +191,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
             variant="outline"
             size="sm"
             onClick={goToToday}
-            className="border-slate-600 bg-slate-950/60 text-xs text-slate-100 hover:border-teal-400 hover:text-teal-300"
+            className="rounded-full bg-slate-950/60 px-4 py-1.5 text-xs font-medium text-slate-100 border border-slate-700 hover:border-teal-400 hover:text-teal-300"
           >
             Today
           </Button>
@@ -228,7 +228,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
                 return (
                   <div
                     key={idx}
-                    className="aspect-square rounded-xl border border-slate-800 bg-slate-900/60"
+                    className="min-h-[72px] md:min-h-[88px] xl:min-h-[96px] rounded-xl border border-slate-800 bg-slate-900/60"
                   />
                 )
               }
@@ -271,7 +271,7 @@ export function TradeCalendar({ filters }: TradeCalendarProps) {
               return (
                 <div
                   key={idx}
-                  className={`flex aspect-square flex-col rounded-xl border px-2 py-1 transition ${bgClasses}`}
+                  className={`flex min-h-[72px] md:min-h-[88px] xl:min-h-[96px] flex-col rounded-xl border px-2 py-1 transition ${bgClasses}`}
                 >
                   {/* Date */}
                   <div className="text-[10px] sm:text-[11px] text-slate-300">

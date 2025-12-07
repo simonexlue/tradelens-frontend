@@ -4,12 +4,7 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  ChartCandlestick,
-  Menu,
-  Plus,
-  X,
-} from "lucide-react"
+import { LayoutDashboard, ChartCandlestick, Menu, Plus, X } from "lucide-react"
 import icon from "public/favicon.png"
 
 import type { NavItem } from "@/types/nav"
@@ -38,16 +33,19 @@ export function MainNav({ items }: MainNavProps) {
   const close = () => setIsOpen(false)
 
   const pageTitle = React.useMemo(() => {
-    if (pathname === "/" || pathname.startsWith("/trades-list"))
-      return "My Trades"
+    if (pathname === "/") return "Dashboard"
+    if (pathname.startsWith("/trades-list")) return "My Trades"
     if (pathname.startsWith("/trades-new")) return "New Trade"
     if (pathname.startsWith("/trade-detail")) return "Trade Details"
-    return "My Trades"
+    return "Dashboard"
   }, [pathname])
 
   const isRouteActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/"
+    }
     if (href === "/trades-list") {
-      return pathname === "/" || pathname.startsWith("/trades-list")
+      return pathname.startsWith("/trades-list")
     }
     if (href === "/trades-new") {
       return pathname.startsWith("/trades-new")
@@ -56,6 +54,7 @@ export function MainNav({ items }: MainNavProps) {
   }
 
   const iconForHref = (href: string) => {
+    if (href === "/") return LayoutDashboard
     if (href === "/trades-new") return Plus
     return ChartCandlestick
   }
@@ -106,7 +105,7 @@ export function MainNav({ items }: MainNavProps) {
               <Image
                 src={icon}
                 alt="App logo"
-                width={32} 
+                width={32}
                 height={32}
                 className="rounded-full pl-[2px]"
               />
