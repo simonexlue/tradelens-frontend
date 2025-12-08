@@ -1,7 +1,7 @@
 "use client"
 
 import { FilterState } from "@/types/filters"
-import { TradeCalendar } from "@/components/trades/calendar/TradeCalendar"
+import { TradeCalendar } from "@/components/dashboard/TradeCalendar"
 import { RecentTradesPanel } from "@/components/dashboard/RecentTrades"
 
 const EMPTY_FILTERS: FilterState = {
