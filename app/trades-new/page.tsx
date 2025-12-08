@@ -29,7 +29,7 @@ function NewTradePageInner() {
   // If tradeid exists, "add image to existing trade" mode
   const existingTradeId = search.get("tradeId")
 
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [note, setNote] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<number>(0)
@@ -40,7 +40,6 @@ function NewTradePageInner() {
   const [takenAt, setTakenAt] = useState("")
   const [exitAt, setExitAt] = useState("")
   const [outcome, setOutcome] = useState("")
-  const [rMultiple, setRMultiple] = useState("")
   const [strategy, setStrategy] = useState("")
   const [mistakesText, setMistakesText] = useState("")
   const [side, setSide] = useState<"" | "buy" | "sell">("")
@@ -48,14 +47,15 @@ function NewTradePageInner() {
   const [exitPrice, setExitPrice] = useState("")
   const [contracts, setContracts] = useState("")
   const [pnl, setPnl] = useState("")
+  const [symbol, setSymbol] = useState("")
 
   const [strategyOptions, setStrategyOptions] = useState<string[]>([])
   const [loadingStrategies, setLoadingStrategies] = useState(true)
 
   const handleInput = (e: any) => {
-    e.target.style.height = "auto";
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  };
+    e.target.style.height = "auto"
+    e.target.style.height = `${e.target.scrollHeight}px`
+  }
 
   function toIsoOrNull(value: string): string | null {
     if (!value) return null
@@ -114,11 +114,6 @@ function NewTradePageInner() {
   }
 
   async function createTrade(): Promise<string> {
-    const parsedR = rMultiple ? Number(rMultiple) : null
-    if (rMultiple && !Number.isFinite(parsedR)) {
-      throw new Error("R multiple must be a valid number")
-    }
-
     const parsedEntry = entryPrice ? Number(entryPrice) : null
     if (entryPrice && !Number.isFinite(parsedEntry)) {
       throw new Error("Entry price must be a valid number")
@@ -129,12 +124,11 @@ function NewTradePageInner() {
       throw new Error("Exit price must be a valid number")
     }
 
-    const parsedContracts =
-      contracts.trim() !== "" ? Number(contracts) : null;
+    const parsedContracts = contracts.trim() !== "" ? Number(contracts) : null
 
     if (parsedContracts !== null) {
       if (!Number.isInteger(parsedContracts) || parsedContracts <= 0) {
-        throw new Error("Contracts must be a positive integer");
+        throw new Error("Contracts must be a positive integer")
       }
     }
 
@@ -143,20 +137,22 @@ function NewTradePageInner() {
       throw new Error("PnL must be a valid number")
     }
 
-    // match CreateTradeBody in backend
-    const payload = {
+    const trimmedSymbol = symbol.trim()
+
+    // match CreateTradePayload (no rMultiple anymore)
+    const payload: any = {
       note: note || "",
       takenAt: toIsoOrNull(takenAt),
       exitAt: toIsoOrNull(exitAt),
       outcome: outcome || null,
-      rMultiple: parsedR,
       strategy: strategy || null,
       mistakes: parseMistakes(mistakesText),
       side: side || null,
       entryPrice: parsedEntry,
       exitPrice: parsedExit,
       contracts: parsedContracts,
-      pnl: parsedPnl, 
+      pnl: parsedPnl,
+      symbol: trimmedSymbol || null,
     }
 
     const res = await fetch("/api/trades", {
@@ -261,77 +257,111 @@ function NewTradePageInner() {
     return JSON.parse(text) as CreateImageResponse
   }
 
-  function validateAndSet(f: File | null) {
-    if (!f) {
-      setFile(null)
-      return
+  function validateAndCollect(selected: FileList | null) {
+    if (!selected?.length) return
+
+    const next: File[] = []
+    for (const f of Array.from(selected)) {
+      if (!ALLOWED_MIME.has(f.type)) {
+        setError("Unsupported file type. Allowed: PNG, JPG, WEBP.")
+        continue
+      }
+      if (f.size > MAX_BYTES) {
+        setError("File too large. Max 10MB.")
+        continue
+      }
+      if (!extFromFilename(f.name)) {
+        setError("File must have a valid image extension (png/jpg/jpeg/webp).")
+        continue
+      }
+      next.push(f)
     }
-    if (!ALLOWED_MIME.has(f.type)) {
-      setError("Unsupported file type. Allowed: PNG, JPG, WEBP.")
-      setFile(null)
-      return
-    }
-    if (f.size > MAX_BYTES) {
-      setError("File too large. Max 10MB.")
-      setFile(null)
-      return
-    }
-    if (!extFromFilename(f.name)) {
-      setError("File must have a valid image extension (png/jpg/jpeg/webp).")
-      setFile(null)
-      return
-    }
-    setFile(f)
+
+    if (next.length === 0) return
+    setFiles((prev) => [...prev, ...next])
   }
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null)
-    const f = e.target.files?.[0] ?? null
-    validateAndSet(f)
+    validateAndCollect(e.target.files)
   }
 
   function onDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     setError(null)
-    const f = e.dataTransfer.files?.[0] ?? null
-    validateAndSet(f)
+    validateAndCollect(e.dataTransfer.files)
   }
 
   function onDragOver(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
   }
 
+  const isAddImageMode = !!existingTradeId
+
+  function validateRequiredFields(): string | null {
+    if (!outcome) {
+      return "Outcome is required"
+    }
+    if (!side) {
+      return "Position is required"
+    }
+    if (!symbol.trim()) {
+      return "Symbol is required"
+    }
+
+    return null
+  }
+
+  const requiredError = !isAddImageMode ? validateRequiredFields() : null
+  const isSaveDisabled =
+    isUploading ||
+    (isAddImageMode && files.length === 0) ||
+    (!isAddImageMode && !!requiredError)
+
   async function handleUpload() {
     try {
-      setIsUploading(true)
-      setProgress(0)
       setError(null)
 
-      if (!file) {
-        setError("Please choose an image first.")
+      setIsUploading(true)
+      setProgress(0)
+
+      // Validate "no image" flows in add-image mode
+      if (isAddImageMode && files.length === 0) {
+        setError("Please choose at least one image to upload.")
         return
       }
 
       // Decide which tradeId to use
       let tradeId = existingTradeId || ""
 
-      // If no existing tradeId, create a new trade
+      // If no existing tradeId, create a new trade (even if no images)
       if (!tradeId) {
         tradeId = await createTrade()
       }
 
-      // Presign
-      const { uploadUrl, key, contentType } = await presign(tradeId, file)
+      // Upload all selected images (if any)
+      if (files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i]
+          const { uploadUrl, key, contentType } = await presign(tradeId, f)
+          const dims = await getImageDimensions(f)
 
-      const dims = await getImageDimensions(file)
+          await putToS3(uploadUrl, contentType, f, (pct) => {
+            // Convert per-file progress into overall 0–100%
+            const overall = Math.round(((i + pct / 100) / files.length) * 100)
+            setProgress(overall)
+          })
 
-      await putToS3(uploadUrl, contentType, file, (pct) => setProgress(pct))
+          const imageResp = await saveImage(tradeId, key, f, dims)
+          console.log("POST /images <-", imageResp)
 
-      const imageResp = await saveImage(tradeId, key, file, dims)
-      console.log("POST /images <-", imageResp)
-
-      if (!imageResp?.imageId) {
-        throw new Error("Image insert missing imageId (check backend logs)")
+          if (!imageResp?.imageId) {
+            throw new Error("Image insert missing imageId (check backend logs)")
+          }
+        }
+      } else {
+        // No images: just mark 100% so progress looks complete
+        setProgress(100)
       }
 
       // Navigate back to detail of this trade
@@ -344,12 +374,10 @@ function NewTradePageInner() {
     }
   }
 
-  const isAddImageMode = !!existingTradeId
-
   return (
     <div className="w-full">
       {error && (
-        <div className="rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
+        <div className="mb-4 rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
           {error}
         </div>
       )}
@@ -357,13 +385,10 @@ function NewTradePageInner() {
       {/* only show metadata + note input when creating a brand new trade */}
       {!isAddImageMode && (
         <div className="space-y-4">
-
           {/* Entry / Exit */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-slate-200 text-sm">
-                Entry time
-              </label>
+              <label className="text-slate-200 text-sm">Entry time</label>
               <input
                 type="datetime-local"
                 className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
@@ -375,9 +400,7 @@ function NewTradePageInner() {
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-slate-200 text-sm">
-                Exit time
-              </label>
+              <label className="text-slate-200 text-sm">Exit time</label>
               <input
                 type="datetime-local"
                 className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
@@ -387,10 +410,12 @@ function NewTradePageInner() {
             </div>
           </div>
 
-          {/* Outcome + R multiple */}
+          {/* Outcome */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Outcome</label>
+              <label className="text-slate-200 text-sm">
+                Outcome <span className="text-red-500">*</span>
+              </label>
               <select
                 className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
                 value={outcome}
@@ -403,23 +428,14 @@ function NewTradePageInner() {
                 <option value="early_exit">Early exit</option>
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">R multiple</label>
-              <input
-                type="number"
-                step="0.01"
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                placeholder="e.g. 1.5"
-                value={rMultiple}
-                onChange={(e) => setRMultiple(e.target.value)}
-              />
-            </div>
           </div>
 
-          {/* Side (Position) + Contracts */}
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* Side (Position) + Contracts + Symbol */}
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Position</label>
+              <label className="text-slate-200 text-sm">
+                Position <span className="text-red-500">*</span>
+              </label>
               <select
                 className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
                 value={side}
@@ -443,6 +459,19 @@ function NewTradePageInner() {
                 onChange={(e) => setContracts(e.target.value)}
               />
             </div>
+
+            {/* Symbol */}
+            <div className="space-y-1">
+              <label className="text-slate-200 text-sm">
+                Symbol <span className="text-red-500">*</span>
+              </label>
+              <input
+                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                placeholder="e.g. MNQH5"
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Entry / Exit price + PnL */}
@@ -459,6 +488,7 @@ function NewTradePageInner() {
               />
             </div>
 
+            {/* Exit price */}
             <div className="space-y-1">
               <label className="text-slate-200 text-sm">Exit price</label>
               <input
@@ -471,6 +501,7 @@ function NewTradePageInner() {
               />
             </div>
 
+            {/* PnL */}
             <div className="space-y-1">
               <label className="text-slate-200 text-sm">PnL ($)</label>
               <input
@@ -483,7 +514,6 @@ function NewTradePageInner() {
               />
             </div>
           </div>
-
 
           {/* Strategy */}
           <div className="space-y-1">
@@ -551,26 +581,35 @@ function NewTradePageInner() {
       >
         <p className="mb-4">
           {isAddImageMode
-            ? "Drag & drop another chart screenshot for this trade"
-            : "Drag & drop your chart screenshot here"}
+            ? "Drag & drop chart screenshots for this trade"
+            : "Drag & drop your chart screenshots here"}
         </p>
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp"
+          multiple
           onChange={onPick}
           className="block mx-auto"
         />
-        {file && (
+        {files.length > 0 && (
           <div className="mt-4 text-sm text-slate-400">
-            Selected: <span className="text-slate-200">{file.name}</span> (
-            {Math.round(file.size / 1024)} KB)
+            <div className="mb-1">
+              Selected {files.length} file{files.length !== 1 ? "s" : ""}:
+            </div>
+            <ul className="max-h-32 overflow-y-auto text-xs text-slate-300">
+              {files.map((f, idx) => (
+                <li key={`${f.name}-${idx}`}>
+                  {f.name} ({Math.round(f.size / 1024)} KB)
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
 
       {/* Progress */}
       {isUploading && (
-        <div className="w-full">
+        <div className="w-full mt-4">
           <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
             <div
               className="h-2 bg-teal-500 transition-all"
@@ -584,14 +623,14 @@ function NewTradePageInner() {
       <div className="mt-6 flex justify-end">
         <button
           onClick={handleUpload}
-          disabled={isUploading || !file}
+          disabled={isSaveDisabled}
           className="rounded-lg bg-teal-500 px-4 py-2 font-medium text-slate-900 hover:opacity-95 disabled:opacity-50"
         >
           {isUploading
             ? "Uploading…"
             : isAddImageMode
-            ? "Upload Image"
-            : "Upload"}
+            ? "Upload Image(s)"
+            : "Save Trade"}
         </button>
       </div>
     </div>
