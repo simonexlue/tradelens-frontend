@@ -308,31 +308,40 @@ export default function TradesListClient() {
         </section>
       )}
 
-      {/* GRID VIEW */}
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
-        {items.map((t) => {
-          const firstKey = t.images?.[0]?.s3_key ?? null
-          const entryTime = t.taken_at ?? t.created_at
-          return (
-            <TradeCard
-              key={t.id}
-              id={t.id}
-              note={t.note}
-              created_at={entryTime}
-              thumbnail_s3_key={firstKey}
-              image_count={t.image_count}
-            />
-          )
-        })}
-      </div>
+      {/* EMPTY STATE / GRID VIEW */}
+      {!loading && items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-sm text-slate-400">
+          <p>No trades imported yet.</p>
+        </div>
+      ) : (
+        <>
+          {/* GRID VIEW */}
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
+            {items.map((t) => {
+              const firstKey = t.images?.[0]?.s3_key ?? null
+              const entryTime = t.taken_at ?? t.created_at
+              return (
+                <TradeCard
+                  key={t.id}
+                  id={t.id}
+                  note={t.note}
+                  created_at={entryTime}
+                  thumbnail_s3_key={firstKey}
+                  image_count={t.image_count}
+                />
+              )
+            })}
+          </div>
 
-      <div className="mt-6 flex justify-center">
-        {cursor && (
-          <Button disabled={loading} onClick={() => loadMore(false)}>
-            {loading ? "Loading..." : "Load more"}
-          </Button>
-        )}
-      </div>
+          <div className="mt-6 flex justify-center">
+            {cursor && (
+              <Button disabled={loading} onClick={() => loadMore(false)}>
+                {loading ? "Loading..." : "Load more"}
+              </Button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -3,8 +3,12 @@
 import * as React from "react"
 import { Suspense, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { CreateTradePayload, TradeOutcome, TradeSide } from "@/types/trades"
 
-type CreateTradeResponse = { tradeId: string }
+type CreateTradeResponse = {
+  tradeId: string
+}
+
 type PresignResponse = {
   uploadUrl: string
   key: string
@@ -18,6 +22,7 @@ type CreateImageResponse = {
   s3Key: string
   createdAt: string
 }
+
 
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"])
 const MAX_BYTES = 10 * 1024 * 1024 // 10MB
@@ -113,64 +118,84 @@ function NewTradePageInner() {
     })
   }
 
-  async function createTrade(): Promise<string> {
-    const parsedEntry = entryPrice ? Number(entryPrice) : null
-    if (entryPrice && !Number.isFinite(parsedEntry)) {
-      throw new Error("Entry price must be a valid number")
-    }
-
-    const parsedExit = exitPrice ? Number(exitPrice) : null
-    if (exitPrice && !Number.isFinite(parsedExit)) {
-      throw new Error("Exit price must be a valid number")
-    }
-
-    const parsedContracts = contracts.trim() !== "" ? Number(contracts) : null
-
-    if (parsedContracts !== null) {
-      if (!Number.isInteger(parsedContracts) || parsedContracts <= 0) {
-        throw new Error("Contracts must be a positive integer")
-      }
-    }
-
-    const parsedPnl = pnl ? Number(pnl) : null
-    if (pnl && !Number.isFinite(parsedPnl)) {
-      throw new Error("PnL must be a valid number")
-    }
-
-    const trimmedSymbol = symbol.trim()
-
-    // match CreateTradePayload (no rMultiple anymore)
-    const payload: any = {
-      note: note || "",
-      takenAt: toIsoOrNull(takenAt),
-      exitAt: toIsoOrNull(exitAt),
-      outcome: outcome || null,
-      strategy: strategy || null,
-      mistakes: parseMistakes(mistakesText),
-      side: side || null,
-      entryPrice: parsedEntry,
-      exitPrice: parsedExit,
-      contracts: parsedContracts,
-      pnl: parsedPnl,
-      symbol: trimmedSymbol || null,
-    }
-
-    const res = await fetch("/api/trades", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    })
-
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      throw new Error(`Create trade failed: ${j.detail ?? res.statusText}`)
-    }
-
-    const data = (await res.json()) as CreateTradeResponse
-    return data.tradeId
+async function createTrade(): Promise<string> {
+  const parsedEntry = entryPrice ? Number(entryPrice) : undefined
+  if (entryPrice && !Number.isFinite(parsedEntry)) {
+    throw new Error("Entry price must be a valid number")
   }
+
+  const parsedExit = exitPrice ? Number(exitPrice) : undefined
+  if (exitPrice && !Number.isFinite(parsedExit)) {
+    throw new Error("Exit price must be a valid number")
+  }
+
+  const parsedContracts =
+    contracts.trim() !== "" ? Number(contracts) : undefined
+
+  if (parsedContracts !== undefined) {
+    if (!Number.isInteger(parsedContracts) || parsedContracts <= 0) {
+      throw new Error("Contracts must be a positive integer")
+    }
+  }
+
+  const parsedPnl = pnl ? Number(pnl) : undefined
+  if (pnl && !Number.isFinite(parsedPnl)) {
+    throw new Error("PnL must be a valid number")
+  }
+
+  const trimmedSymbol = symbol.trim()
+
+  const strategies =
+    strategy.trim() !== "" ? [strategy.trim()] : undefined
+
+  const parsedMistakes = parseMistakes(mistakesText) ?? undefined
+
+  const payload: CreateTradePayload = {
+    note: note || undefined,
+    takenAt: toIsoOrNull(takenAt),
+    exitAt: toIsoOrNull(exitAt),
+    outcome: (outcome || undefined) as TradeOutcome | undefined,
+    strategies,
+    mistakes: parsedMistakes,
+    side: (side || undefined) as TradeSide | undefined,
+    entryPrice: parsedEntry,
+    exitPrice: parsedExit,
+    contracts: parsedContracts,
+    pnl: parsedPnl,
+    symbol: trimmedSymbol || undefined,
+  }
+
+  const res = await fetch("/api/trades", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    let message = res.statusText
+    try {
+      const j = await res.json()
+      console.error("Create trade error body:", j)
+
+      if (j?.detail) {
+        message =
+          typeof j.detail === "string"
+            ? j.detail
+            : JSON.stringify(j.detail)
+      } else {
+        message = JSON.stringify(j)
+      }
+    } catch {
+    }
+
+    throw new Error(`Create trade failed: ${message}`)
+  }
+
+  const data = (await res.json()) as CreateTradeResponse
+  return data.tradeId
+}
 
   async function presign(tradeId: string, f: File): Promise<PresignResponse> {
     const extRaw = extFromFilename(f.name)
