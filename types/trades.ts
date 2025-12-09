@@ -42,6 +42,7 @@ export type TradeListItem = {
   outcome: TradeOutcome | null;
   session: Session | null;
   strategies: string[] | null;
+  pnl: number | null;
   symbol: string | null;
   images: { s3_key: string; width?: number; height?: number }[]; // thumbnail only
   image_count: number;

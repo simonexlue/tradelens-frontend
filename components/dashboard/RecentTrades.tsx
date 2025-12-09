@@ -96,9 +96,9 @@ export function RecentTradesPanel() {
         ) : (
           <div className="divide-y divide-slate-800/80">
             {items.map((t) => {
-              const symbol = (t as any).symbol ?? "—"
-              const pnl = (t as any).pnl as number | null | undefined
-              const date = formatDate((t as any).taken_at ?? t.created_at)
+              const symbol = t.symbol ?? "—"
+              const pnl = t.pnl
+              const date = formatDate(t.taken_at ?? t.created_at)
 
               const pnlClass =
                 pnl == null || pnl === 0
