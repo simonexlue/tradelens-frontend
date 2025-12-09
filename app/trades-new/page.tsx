@@ -4,6 +4,10 @@ import * as React from "react"
 import { Suspense, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CreateTradePayload, TradeOutcome, TradeSide } from "@/types/trades"
+import { Upload } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { TabsList, Tabs, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 type CreateTradeResponse = {
   tradeId: string
@@ -56,6 +60,8 @@ function NewTradePageInner() {
 
   const [strategyOptions, setStrategyOptions] = useState<string[]>([])
   const [loadingStrategies, setLoadingStrategies] = useState(true)
+
+  const [mode, setMode] = useState<"manual" | "csv">("manual")
 
   const handleInput = (e: any) => {
     e.target.style.height = "auto"
@@ -399,268 +405,392 @@ async function createTrade(): Promise<string> {
     }
   }
 
-  return (
-    <div className="w-full">
-      {error && (
-        <div className="mb-4 rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
-          {error}
+return (
+  <div className="w-full">
+    {error && (
+      <div className="mb-4 rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
+        {error}
+      </div>
+    )}
+
+    {isAddImageMode ? (
+      <>
+        {/* only show metadata + note input when creating a brand new trade */}
+
+        {/* Drop zone */}
+        <div
+          ref={dropRef}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
+        >
+          <p className="mb-4">
+            {isAddImageMode
+              ? "Drag & drop chart screenshots for this trade"
+              : "Drag & drop your chart screenshots here"}
+          </p>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            onChange={onPick}
+            className="block mx-auto"
+          />
+          {files.length > 0 && (
+            <div className="mt-4 text-sm text-slate-400">
+              <div className="mb-1">
+                Selected {files.length} file{files.length !== 1 ? "s" : ""}:
+              </div>
+              <ul className="max-h-32 overflow-y-auto text-xs text-slate-300">
+                {files.map((f, idx) => (
+                  <li key={`${f.name}-${idx}`}>
+                    {f.name} ({Math.round(f.size / 1024)} KB)
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* only show metadata + note input when creating a brand new trade */}
-      {!isAddImageMode && (
-        <div className="space-y-4">
-          {/* Entry / Exit */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Entry time</label>
-              <input
-                type="datetime-local"
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                value={takenAt}
-                onChange={(e) => setTakenAt(e.target.value)}
-              />
-              <p className="text-xs text-slate-500">
-                Used to auto-detect session (London / NY / Break / Asian).
-              </p>
-            </div>
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Exit time</label>
-              <input
-                type="datetime-local"
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                value={exitAt}
-                onChange={(e) => setExitAt(e.target.value)}
+        {/* Progress */}
+        {isUploading && (
+          <div className="w-full mt-4">
+            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-2 bg-teal-500 transition-all"
+                style={{ width: `${progress}%` }}
               />
             </div>
-          </div>
-
-          {/* Outcome */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">
-                Outcome <span className="text-red-500">*</span>
-              </label>
-              <select
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                value={outcome}
-                onChange={(e) => setOutcome(e.target.value)}
-              >
-                <option value="">Select outcome</option>
-                <option value="win">Win</option>
-                <option value="loss">Loss</option>
-                <option value="breakeven">Breakeven</option>
-                <option value="early_exit">Early exit</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Side (Position) + Contracts + Symbol */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">
-                Position <span className="text-red-500">*</span>
-              </label>
-              <select
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                value={side}
-                onChange={(e) => setSide(e.target.value as "buy" | "sell" | "")}
-              >
-                <option value="">Select position</option>
-                <option value="buy">Buy (long)</option>
-                <option value="sell">Sell (short)</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Contracts</label>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                placeholder="e.g. 3"
-                value={contracts}
-                onChange={(e) => setContracts(e.target.value)}
-              />
-            </div>
-
-            {/* Symbol */}
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">
-                Symbol <span className="text-red-500">*</span>
-              </label>
-              <input
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                placeholder="e.g. MNQH5"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Entry / Exit price + PnL */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Entry price</label>
-              <input
-                type="number"
-                step="0.25"
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                placeholder="e.g. 25193.50"
-                value={entryPrice}
-                onChange={(e) => setEntryPrice(e.target.value)}
-              />
-            </div>
-
-            {/* Exit price */}
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">Exit price</label>
-              <input
-                type="number"
-                step="0.25"
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                placeholder="e.g. 25173.50"
-                value={exitPrice}
-                onChange={(e) => setExitPrice(e.target.value)}
-              />
-            </div>
-
-            {/* PnL */}
-            <div className="space-y-1">
-              <label className="text-slate-200 text-sm">PnL ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-                placeholder="e.g. -100"
-                value={pnl}
-                onChange={(e) => setPnl(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Strategy */}
-          <div className="space-y-1">
-            <label className="text-slate-200 text-sm">
-              Strategy{" "}
-              {loadingStrategies && (
-                <span className="text-xs text-slate-500">(loading…)</span>
-              )}
-            </label>
-            <input
-              list="strategy-options"
-              className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
-              placeholder="FVG, Liquidity Grab, VWAP…"
-              value={strategy}
-              onChange={(e) => setStrategy(e.target.value)}
-            />
-            <datalist id="strategy-options">
-              {strategyOptions.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-            <p className="text-xs text-slate-500">
-              Start typing to reuse a previous strategy or enter a new one.
-            </p>
-          </div>
-
-          {/* Mistakes */}
-          <div className="space-y-1">
-            <label className="text-slate-200 text-sm">
-              Mistakes (optional)
-            </label>
-            <textarea
-              className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none text-sm"
-              placeholder="e.g. Entered late, Ignored HTF trend"
-              value={mistakesText}
-              onInput={handleInput}
-              onChange={(e) => setMistakesText(e.target.value)}
-            />
-            <p className="text-xs text-slate-500">
-              Separate with commas, semicolons, or new lines.
-            </p>
-          </div>
-
-          {/* Note */}
-          <div className="space-y-1">
-            <label className="text-slate-200 text-sm">Note (optional)</label>
-            <textarea
-              className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none"
-              rows={3}
-              placeholder="What happened on this trade?"
-              value={note}
-              onInput={handleInput}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Drop zone */}
-      <div
-        ref={dropRef}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
-      >
-        <p className="mb-4">
-          {isAddImageMode
-            ? "Drag & drop chart screenshots for this trade"
-            : "Drag & drop your chart screenshots here"}
-        </p>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          multiple
-          onChange={onPick}
-          className="block mx-auto"
-        />
-        {files.length > 0 && (
-          <div className="mt-4 text-sm text-slate-400">
-            <div className="mb-1">
-              Selected {files.length} file{files.length !== 1 ? "s" : ""}:
-            </div>
-            <ul className="max-h-32 overflow-y-auto text-xs text-slate-300">
-              {files.map((f, idx) => (
-                <li key={`${f.name}-${idx}`}>
-                  {f.name} ({Math.round(f.size / 1024)} KB)
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2 text-xs text-slate-400">{progress}%</div>
           </div>
         )}
+
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={handleUpload}
+            disabled={isSaveDisabled}
+            className="rounded-lg bg-teal-500 px-4 py-2 font-medium text-slate-900 hover:opacity-95 disabled:opacity-50"
+          >
+            {isUploading
+              ? "Uploading…"
+              : isAddImageMode
+              ? "Upload Image(s)"
+              : "Save Trade"}
+          </button>
+        </div>
+      </>
+    ) : (
+      <Tabs
+        value={mode}
+        onValueChange={(val) => setMode(val as "manual" | "csv")}
+        className="w-full"
+      >
+        <TabsList className="mb-4 grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+          <TabsTrigger value="csv">CSV Import</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="manual">
+          {/* only show metadata + note input when creating a brand new trade */}
+          {!isAddImageMode && (
+            <div className="space-y-4">
+              {/* Entry / Exit */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">Entry time</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    value={takenAt}
+                    onChange={(e) => setTakenAt(e.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Used to auto-detect session (London / NY / Break / Asian).
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">Exit time</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    value={exitAt}
+                    onChange={(e) => setExitAt(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Outcome */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">
+                    Outcome <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    value={outcome}
+                    onChange={(e) => setOutcome(e.target.value)}
+                  >
+                    <option value="">Select outcome</option>
+                    <option value="win">Win</option>
+                    <option value="loss">Loss</option>
+                    <option value="breakeven">Breakeven</option>
+                    <option value="early_exit">Early exit</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Side (Position) + Contracts + Symbol */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">
+                    Position <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    value={side}
+                    onChange={(e) =>
+                      setSide(e.target.value as "buy" | "sell" | "")
+                    }
+                  >
+                    <option value="">Select position</option>
+                    <option value="buy">Buy (long)</option>
+                    <option value="sell">Sell (short)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">Contracts</label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    placeholder="e.g. 3"
+                    value={contracts}
+                    onChange={(e) => setContracts(e.target.value)}
+                  />
+                </div>
+
+                {/* Symbol */}
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">
+                    Symbol <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    placeholder="e.g. MNQH5"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Entry / Exit price + PnL */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">Entry price</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    placeholder="e.g. 25193.50"
+                    value={entryPrice}
+                    onChange={(e) => setEntryPrice(e.target.value)}
+                  />
+                </div>
+
+                {/* Exit price */}
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">Exit price</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    placeholder="e.g. 25173.50"
+                    value={exitPrice}
+                    onChange={(e) => setExitPrice(e.target.value)}
+                  />
+                </div>
+
+                {/* PnL */}
+                <div className="space-y-1">
+                  <label className="text-slate-200 text-sm">PnL ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                    placeholder="e.g. -100"
+                    value={pnl}
+                    onChange={(e) => setPnl(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Strategy */}
+              <div className="space-y-1">
+                <label className="text-slate-200 text-sm">
+                  Strategy{" "}
+                  {loadingStrategies && (
+                    <span className="text-xs text-slate-500">(loading…)</span>
+                  )}
+                </label>
+                <input
+                  list="strategy-options"
+                  className="w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100 outline-none"
+                  placeholder="FVG, Liquidity Grab, VWAP…"
+                  value={strategy}
+                  onChange={(e) => setStrategy(e.target.value)}
+                />
+                <datalist id="strategy-options">
+                  {strategyOptions.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-slate-500">
+                  Start typing to reuse a previous strategy or enter a new one.
+                </p>
+              </div>
+
+              {/* Mistakes */}
+              <div className="space-y-1">
+                <label className="text-slate-200 text-sm">
+                  Mistakes (optional)
+                </label>
+                <textarea
+                  className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none text-sm"
+                  placeholder="e.g. Entered late, Ignored HTF trend"
+                  value={mistakesText}
+                  onInput={handleInput}
+                  onChange={(e) => setMistakesText(e.target.value)}
+                />
+                <p className="text-xs text-slate-500">
+                  Separate with commas, semicolons, or new lines.
+                </p>
+              </div>
+
+              {/* Note */}
+              <div className="space-y-1">
+                <label className="text-slate-200 text-sm">Note (optional)</label>
+                <textarea
+                  className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 text-slate-100 outline-none"
+                  rows={3}
+                  placeholder="What happened on this trade?"
+                  value={note}
+                  onInput={handleInput}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Drop zone */}
+          <div
+            ref={dropRef}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
+          >
+            <p className="mb-4">
+              {isAddImageMode
+                ? "Drag & drop chart screenshots for this trade"
+                : "Drag & drop your chart screenshots here"}
+            </p>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              onChange={onPick}
+              className="block mx-auto"
+            />
+            {files.length > 0 && (
+              <div className="mt-4 text-sm text-slate-400">
+                <div className="mb-1">
+                  Selected {files.length} file{files.length !== 1 ? "s" : ""}:
+                </div>
+                <ul className="max-h-32 overflow-y-auto text-xs text-slate-300">
+                  {files.map((f, idx) => (
+                    <li key={`${f.name}-${idx}`}>
+                      {f.name} ({Math.round(f.size / 1024)} KB)
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Progress */}
+          {isUploading && (
+            <div className="w-full mt-4">
+              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-2 bg-teal-500 transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-slate-400">{progress}%</div>
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={handleUpload}
+              disabled={isSaveDisabled}
+              className="rounded-lg bg-teal-500 px-4 py-2 font-medium text-slate-900 hover:opacity-95 disabled:opacity-50"
+            >
+              {isUploading
+                ? "Uploading…"
+                : isAddImageMode
+                ? "Upload Image(s)"
+                : "Save Trade"}
+            </button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="csv">
+          <CsvImportPanel />
+        </TabsContent>
+      </Tabs>
+    )}
+  </div>
+)
+
+}
+
+function CsvImportPanel() {
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <div>
+        <h2 className="text-lg font-medium text-slate-100">
+          Import trades from CSV
+        </h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Upload a CSV file containing your trades. Rows with a valid symbol,
+          side (buy/sell), and PnL will be imported as new trades.
+        </p>
       </div>
 
-      {/* Progress */}
-      {isUploading && (
-        <div className="w-full mt-4">
-          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className="h-2 bg-teal-500 transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="mt-2 text-xs text-slate-400">{progress}%</div>
-        </div>
-      )}
+      <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-slate-700 bg-slate-950/40 p-4">
+        <Button type="button" disabled>
+          <Upload className="mr-2 h-4 w-4" />
+          Upload CSV (coming soon)
+        </Button>
 
-      <div className="mt-6 flex justify-end">
-        <button
-          onClick={handleUpload}
-          disabled={isSaveDisabled}
-          className="rounded-lg bg-teal-500 px-4 py-2 font-medium text-slate-900 hover:opacity-95 disabled:opacity-50"
-        >
-          {isUploading
-            ? "Uploading…"
-            : isAddImageMode
-            ? "Upload Image(s)"
-            : "Save Trade"}
-        </button>
+        <p className="text-xs text-slate-500">
+          Required columns:{" "}
+          <span className="font-mono">
+            symbol, side, pnl
+          </span>
+          . Optional:{" "}
+          <span className="font-mono">
+            entry_time, exit_time, entry_price, exit_price, contracts, duration
+          </span>
+          .
+        </p>
       </div>
     </div>
   )
 }
+
 
 export default function NewTradePage() {
   return (
