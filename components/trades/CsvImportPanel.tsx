@@ -3,9 +3,9 @@
 import React, { useState } from "react"
 import { Upload } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { parseCsvForSource } from "@/lib/csvImport"
 import type { CsvSourceId } from "@/lib/csvImport/types"
+import { Button } from "@/components/ui/button"
 
 type ImportResult = {
   insertedCount: number
@@ -47,9 +47,7 @@ export function CsvImportPanel() {
           const j = await res.json()
           if (j?.detail) {
             message =
-              typeof j.detail === "string"
-                ? j.detail
-                : JSON.stringify(j.detail)
+              typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail)
           } else {
             message = JSON.stringify(j)
           }
@@ -61,10 +59,19 @@ export function CsvImportPanel() {
 
       const data = (await res.json()) as ImportResult
 
+      const importedPart = `Imported ${data.insertedCount} trade${
+        data.insertedCount === 1 ? "" : "s"
+      }`
+
+      const skippedPart =
+        data.failedCount > 0
+          ? `Skipped ${data.failedCount} row${
+              data.failedCount === 1 ? "" : "s"
+            } as duplicates or failed validation`
+          : ""
+
       setCsvInfo(
-        `Imported ${data.insertedCount} trade${
-          data.insertedCount === 1 ? "" : "s"
-        }${data.failedCount ? ` (${data.failedCount} failed validation)` : ""}.`,
+        skippedPart ? `${importedPart}. ${skippedPart}.` : `${importedPart}.`
       )
     } catch (err: any) {
       console.error(err)
@@ -136,12 +143,10 @@ export function CsvImportPanel() {
           </div>
         )}
 
-        {csvError && (
-          <div className="text-xs text-red-400">{csvError}</div>
-        )}
+        {csvError && <div className="text-xs text-red-400">{csvError}</div>}
 
         {csvInfo && (
-          <div className="text-xs text-teal-400">{csvInfo}</div>
+        <div className="text-xs text-teal-400">{csvInfo}</div>
         )}
 
         <Button
