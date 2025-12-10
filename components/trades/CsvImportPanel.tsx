@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 type ImportResult = {
   insertedCount: number
   failedCount: number
+  skippedCount: number
 }
 
 export function CsvImportPanel() {
@@ -59,20 +60,34 @@ export function CsvImportPanel() {
 
       const data = (await res.json()) as ImportResult
 
-      const importedPart = `Imported ${data.insertedCount} trade${
-        data.insertedCount === 1 ? "" : "s"
-      }`
+      const parts: string[] = []
 
-      const skippedPart =
-        data.failedCount > 0
-          ? `Skipped ${data.failedCount} row${
-              data.failedCount === 1 ? "" : "s"
-            } as duplicates or failed validation`
-          : ""
-
-      setCsvInfo(
-        skippedPart ? `${importedPart}. ${skippedPart}.` : `${importedPart}.`
+      // Success
+      parts.push(
+        `Imported ${data.insertedCount} trade${
+          data.insertedCount === 1 ? "" : "s"
+        }`
       )
+
+      // Duplicates
+      if (data.skippedCount > 0) {
+        parts.push(
+          `Skipped ${data.skippedCount} duplicate row${
+            data.skippedCount === 1 ? "" : "s"
+          }`
+        )
+      }
+
+      // Validation / processing failures
+      if (data.failedCount > 0) {
+        parts.push(
+          `Failed to import ${data.failedCount} row${
+            data.failedCount === 1 ? "" : "s"
+          } due to validation errors`
+        )
+      }
+
+      setCsvInfo(parts.join(". ") + ".")
     } catch (err: any) {
       console.error(err)
       setCsvError(err?.message ?? "Failed to import trades from CSV.")
@@ -145,9 +160,7 @@ export function CsvImportPanel() {
 
         {csvError && <div className="text-xs text-red-400">{csvError}</div>}
 
-        {csvInfo && (
-        <div className="text-xs text-teal-400">{csvInfo}</div>
-        )}
+        {csvInfo && <div className="text-xs text-teal-400">{csvInfo}</div>}
 
         <Button
           disabled={!csvFile || isBusy}
