@@ -9,6 +9,7 @@ const EMPTY_FILTERS: FilterState = {
   sessions: [],
   strategies: [],
   symbols: [],
+  accounts: [],
 }
 
 export default function DashboardPage() {

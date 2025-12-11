@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import TradeCard from "@/components/TradeCard"
 import { ActiveFilters } from "@/components/filters/ActiveFilters"
 import { FilterGroup } from "@/components/filters/FilterGroup"
+import Link from "next/link"
 
 type PageResp = { items: TradeListItem[]; nextCursor: string | null }
 
@@ -75,8 +76,8 @@ export default function TradesListClient() {
 
   // Map accountId -> name for display
   const accountLabelMap = useMemo(() => {
-    const map: Record<string,string> = {}
-    for(const acc of filterOptions.accounts) {
+    const map: Record<string, string> = {}
+    for (const acc of filterOptions.accounts) {
       map[acc.id] = acc.label
     }
     return map
@@ -226,7 +227,7 @@ export default function TradesListClient() {
       {(filterOptions.outcomes.length > 0 ||
         filterOptions.sessions.length > 0 ||
         filterOptions.strategies.length > 0 ||
-        filterOptions.symbols.length > 0 || 
+        filterOptions.symbols.length > 0 ||
         filterOptions.accounts.length > 0) && (
         <section className="mb-4">
           {/* Header row */}
@@ -375,6 +376,14 @@ export default function TradesListClient() {
                 />
               )
             })}
+            <Link
+              href="/trades-new"
+              className="group flex min-h-[260px] w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-800/50 shadow-sm transition hover:border-teal-400/70 hover:bg-slate-800/50"
+            >
+              <span className="text-sm text-slate-400 group-hover:text-slate-100">
+                + Add Trade
+              </span>
+            </Link>
           </div>
 
           <div className="mt-6 flex justify-center">
