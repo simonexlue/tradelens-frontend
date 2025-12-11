@@ -173,6 +173,15 @@ export function MainNav({ items }: MainNavProps) {
           )}
         </div>
       </aside>
+
+      {/* Click-outside Overlay*/}
+      {isOpen &&(
+        <div
+          className="fixed inset-0 z-30 bg-black/0"
+          onClick={close}
+          aria-hidden="true"
+        />
+      )}
     </>
   )
 }

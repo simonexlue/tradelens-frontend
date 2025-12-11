@@ -1,8 +1,8 @@
 "use client"
 
-import { Pencil, X } from "lucide-react"
+import Link from "next/link"
+import { ImagePlus, Pencil, X } from "lucide-react"
 import type { ImageRec } from "@/types/trades"
-
 import { ReactNode } from "react"
 
 function OverviewTagPill({
@@ -25,6 +25,7 @@ function OverviewTagPill({
 }
 
 interface TradeImagesSectionProps {
+  tradeId: string | null
   images: ImageRec[]
   isEditing: boolean // delete mode
   onEnterEdit: () => void
@@ -38,6 +39,7 @@ interface TradeImagesSectionProps {
 }
 
 export function TradeImagesSection({
+  tradeId,
   images,
   isEditing,
   onEnterEdit,
@@ -61,10 +63,21 @@ export function TradeImagesSection({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">
-            {images.length} {images.length === 1 ? "image" : "images"}
-          </span>
+        <div className="flex items-center gap-2">
+          {/* Upload icon */}
+          {tradeId && (
+            <Link href={`/trades-new?tradeId=${tradeId}`}>
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-full 
+                           bg-slate-800 text-slate-100 hover:bg-slate-700"
+                title="Upload another image"
+              >
+                <ImagePlus className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </Link>
+          )}
+
           {images.length > 0 && (
             <>
               {!isEditing ? (
@@ -91,9 +104,8 @@ export function TradeImagesSection({
 
       {images.length === 0 ? (
         <p className="text-sm text-slate-400">
-          No images yet. Use{" "}
-          <span className="font-medium">&quot;Upload another image&quot;</span>{" "}
-          to add screenshots.
+          No images yet. Use the{" "}
+          <span className="font-medium">+ icon</span> above to add screenshots.
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

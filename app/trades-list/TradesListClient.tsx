@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { ChevronDown } from "lucide-react"
 
 import type { FilterOptions, FilterState } from "@/types/filters"
@@ -14,7 +15,6 @@ import { Button } from "@/components/ui/button"
 import TradeCard from "@/components/TradeCard"
 import { ActiveFilters } from "@/components/filters/ActiveFilters"
 import { FilterGroup } from "@/components/filters/FilterGroup"
-import Link from "next/link"
 
 type PageResp = { items: TradeListItem[]; nextCursor: string | null }
 
@@ -32,7 +32,7 @@ const SESSION_LABELS: Record<Session, string> = {
   Asia: "Asia",
 }
 
-const PAGE_LIMIT = 10
+const PAGE_LIMIT = 9
 
 async function fetchTrades(opts: FetchTradesOpts): Promise<PageResp> {
   const qs = new URLSearchParams({
@@ -373,12 +373,16 @@ export default function TradesListClient() {
                   created_at={entryTime}
                   thumbnail_s3_key={firstKey}
                   image_count={t.image_count}
+                  symbol={t.symbol ?? undefined}
+                  pnl={t.pnl ?? null}
                 />
               )
             })}
             <Link
               href="/trades-new"
-              className="group flex min-h-[260px] w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-800/50 shadow-sm transition hover:border-teal-400/70 hover:bg-slate-800/50"
+              className="group flex w-full h-full items-center justify-center rounded-2xl 
+             border border-slate-800 bg-slate-800/50 shadow-sm transition 
+             hover:border-teal-400/70 hover:bg-slate-800/50"
             >
               <span className="text-sm text-slate-400 group-hover:text-slate-100">
                 + Add Trade

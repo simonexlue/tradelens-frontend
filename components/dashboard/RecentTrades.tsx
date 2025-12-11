@@ -108,16 +108,17 @@ export function RecentTradesPanel() {
                   : "text-red-400"
 
               return (
-                <div
+                <Link
                   key={t.id}
-                  className="grid grid-cols-[1.2fr_1.2fr_1fr] items-center px-3 py-2.5 text-xs text-slate-100 hover:bg-slate-800/60"
+                  href={`/trade-detail?id=${t.id}`}
+                  className="grid grid-cols-[1.2fr_1.2fr_1fr] items-center px-3 py-2.5 text-xs text-slate-100 hover:bg-slate-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 cursor-pointer"
                 >
                   <span className="truncate text-slate-100">{symbol}</span>
                   <span className="truncate text-slate-300">{date}</span>
                   <span className={`truncate text-right ${pnlClass}`}>
                     {formatPnl(pnl)}
                   </span>
-                </div>
+                </Link>
               )
             })}
           </div>

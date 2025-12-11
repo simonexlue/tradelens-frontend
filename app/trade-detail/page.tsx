@@ -12,14 +12,13 @@ import type {
   TradeSide,
   UpdateTradePayload,
 } from "@/types/trades"
-import { Button } from "@/components/ui/button"
 import { ImageLightbox } from "@/components/ui/ImageLightbox"
-
-import { TradeOverviewSection } from "@/components/trades/TradeOverviewSection"
-import { TradeImagesSection } from "@/components/trades/TradeImageSection"
-import { TradeNoteSection } from "@/components/trades/TradeNoteSection"
-import { TradeMistakesSection } from "@/components/trades/TradeMistakesSection"
+import { Button } from "@/components/ui/button"
 import { TradeAnalysisSection } from "@/components/trades/TradeAnalysisSection"
+import { TradeImagesSection } from "@/components/trades/TradeImageSection"
+import { TradeMistakesSection } from "@/components/trades/TradeMistakesSection"
+import { TradeNoteSection } from "@/components/trades/TradeNoteSection"
+import { TradeOverviewSection } from "@/components/trades/TradeOverviewSection"
 
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
@@ -148,6 +147,9 @@ function TradeDetailPage() {
 
   const [draftTakenAt, setDraftTakenAt] = useState<string>("")
   const [draftExitAt, setDraftExitAt] = useState<string>("")
+  // keep the original input-string versions so we know if user changed them
+  const [originalTakenAtInput, setOriginalTakenAtInput] = useState<string>("")
+  const [originalExitAtInput, setOriginalExitAtInput] = useState<string>("")
 
   const [draftSide, setDraftSide] = useState<TradeSide | null>(null)
   const [draftEntryPrice, setDraftEntryPrice] = useState<string>("")
@@ -201,8 +203,16 @@ function TradeDetailPage() {
     setDraftMistakes(
       from.mistakes && from.mistakes.length > 0 ? from.mistakes.join("\n") : ""
     )
-    setDraftTakenAt(isoToLocalInput(from.taken_at ?? null))
-    setDraftExitAt(isoToLocalInput(from.exit_at ?? null))
+
+    const takenInput = isoToLocalInput(from.taken_at ?? null)
+    const exitInput = isoToLocalInput(from.exit_at ?? null)
+
+    setDraftTakenAt(takenInput)
+    setDraftExitAt(exitInput)
+
+    // keep originals so we can detect whether user actually changed the times
+    setOriginalTakenAtInput(takenInput)
+    setOriginalExitAtInput(exitInput)
 
     setDraftSide(from.side ?? null)
 
@@ -238,7 +248,11 @@ function TradeDetailPage() {
 
   function beginEditing(section: EditingSection) {
     if (!trade) return
-    if (section === "overview" || section === "note" || section === "mistakes") {
+    if (
+      section === "overview" ||
+      section === "note" ||
+      section === "mistakes"
+    ) {
       hydrateDrafts(trade)
     }
     setStrategyInput("")
@@ -303,10 +317,18 @@ function TradeDetailPage() {
   async function handleSaveOverview() {
     if (!tradeId) return
 
-    const takenAtIso =
-      draftTakenAt.trim() !== "" ? new Date(draftTakenAt).toISOString() : null
-    const exitAtIso =
-      draftExitAt.trim() !== "" ? new Date(draftExitAt).toISOString() : null
+    let takenAtIso: string | null = null
+    let exitAtIso: string | null = null
+
+    // Only update takenAt if user actually changed the field
+    if (draftTakenAt.trim() !== "" && draftTakenAt !== originalTakenAtInput) {
+      takenAtIso = new Date(draftTakenAt).toISOString()
+    }
+
+    // Only update exitAt if user actually changed the field
+    if (draftExitAt.trim() !== "" && draftExitAt !== originalExitAtInput) {
+      exitAtIso = new Date(draftExitAt).toISOString()
+    }
 
     const parseNumberField = (
       raw: string,
@@ -493,7 +515,7 @@ function TradeDetailPage() {
     try {
       setDeletingTrade(true)
       await deleteTradeApi(tradeId)
-      router.push("/trades-list")
+      router.back()
     } catch (e: any) {
       console.error(e)
       alert(e?.message || "Failed to delete trade")
@@ -509,7 +531,7 @@ function TradeDetailPage() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/trades-list")}
+            onClick={() => router.back()}
             className="rounded-xl border border-slate-800 px-2 py-1 text-sm text-slate-300 hover:border-teal-500/50 hover:text-teal-300"
           >
             ← Back
@@ -517,17 +539,6 @@ function TradeDetailPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            onClick={() => {
-              if (!tradeId || deletingTrade) return
-              router.push(`/trades-new?tradeId=${tradeId}`)
-            }}
-            disabled={!tradeId || deletingTrade}
-            className="bg-[#18B6B2] hover:bg-[#10a3a0] text-slate-900 disabled:opacity-60"
-          >
-            Upload another image
-          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -591,6 +602,7 @@ function TradeDetailPage() {
           />
 
           <TradeImagesSection
+            tradeId={tradeId ?? null}
             images={images}
             isEditing={isImagesEditing}
             onEnterEdit={() => beginEditing("images")}

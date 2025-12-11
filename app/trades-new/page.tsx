@@ -4,13 +4,13 @@ import * as React from "react"
 import { Suspense, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Upload } from "lucide-react"
+import Papa from "papaparse"
 
 import { CreateTradePayload, TradeOutcome, TradeSide } from "@/types/trades"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Papa from "papaparse"
-import { CsvImportPanel } from "@/components/trades/CsvImportPanel"
 import { AccountSelect } from "@/components/accounts/AccountSelect"
+import { CsvImportPanel } from "@/components/trades/CsvImportPanel"
 
 type CreateTradeResponse = {
   tradeId: string
@@ -65,7 +65,9 @@ function NewTradePageInner() {
 
   const [mode, setMode] = useState<"manual" | "csv">("manual")
 
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null
+  )
 
   const handleInput = (e: any) => {
     e.target.style.height = "auto"
@@ -431,22 +433,45 @@ function NewTradePageInner() {
             ref={dropRef}
             onDrop={onDrop}
             onDragOver={onDragOver}
-            className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
+            className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 px-8 py-10
+             flex flex-col items-center justify-center text-center text-slate-300 gap-3"
           >
-            <p className="mb-4">
+            <Upload className="h-8 w-8 text-slate-500" aria-hidden="true" />
+
+            <p className="text-sm font-medium">
               {isAddImageMode
                 ? "Drag & drop chart screenshots for this trade"
                 : "Drag & drop your chart screenshots here"}
             </p>
+
+            <p className="text-xs text-slate-500">
+              PNG, JPG or WEBP • Max 10MB each
+            </p>
+
+            {/* Hidden real input */}
             <input
+              id="file-input"
               type="file"
               accept="image/png,image/jpeg,image/webp"
               multiple
               onChange={onPick}
-              className="block mx-auto"
+              className="hidden"
             />
+
+            {/* Pretty button that triggers the input */}
+            <label
+              htmlFor="file-input"
+              className="mt-2 inline-flex items-center rounded-lg bg-slate-100/90 px-4 py-2
+               text-sm font-medium text-slate-900 shadow-sm cursor-pointer
+               hover:bg-white focus-visible:outline-none focus-visible:ring-2
+               focus-visible:ring-teal-500 focus-visible:ring-offset-2
+               focus-visible:ring-offset-slate-900"
+            >
+              Choose files
+            </label>
+
             {files.length > 0 && (
-              <div className="mt-4 text-sm text-slate-400">
+              <div className="mt-4 w-full max-w-md text-left text-sm text-slate-400">
                 <div className="mb-1">
                   Selected {files.length} file{files.length !== 1 ? "s" : ""}:
                 </div>
@@ -702,22 +727,44 @@ function NewTradePageInner() {
               ref={dropRef}
               onDrop={onDrop}
               onDragOver={onDragOver}
-              className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-300"
+              className="mt-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900 px-8 py-10
+             flex flex-col items-center justify-center text-center text-slate-300 gap-3"
             >
-              <p className="mb-4">
+              <Upload className="h-8 w-8 text-slate-500" aria-hidden="true" />
+
+              <p className="text-sm font-medium">
                 {isAddImageMode
                   ? "Drag & drop chart screenshots for this trade"
                   : "Drag & drop your chart screenshots here"}
               </p>
+
+              <p className="text-xs text-slate-500">
+                PNG, JPG or WEBP • Max 10MB each
+              </p>
+
+              {/* Hidden real input */}
               <input
+                id="file-input"
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 multiple
                 onChange={onPick}
-                className="block mx-auto"
+                className="hidden"
               />
+
+              <label
+                htmlFor="file-input"
+                className="mt-2 inline-flex items-center rounded-lg bg-slate-100/90 px-4 py-2
+               text-sm font-medium text-slate-900 shadow-sm cursor-pointer
+               hover:bg-white focus-visible:outline-none focus-visible:ring-2
+               focus-visible:ring-teal-500 focus-visible:ring-offset-2
+               focus-visible:ring-offset-slate-900"
+              >
+                Choose files
+              </label>
+
               {files.length > 0 && (
-                <div className="mt-4 text-sm text-slate-400">
+                <div className="mt-4 w-full max-w-md text-left text-sm text-slate-400">
                   <div className="mb-1">
                     Selected {files.length} file{files.length !== 1 ? "s" : ""}:
                   </div>
@@ -761,7 +808,7 @@ function NewTradePageInner() {
           </TabsContent>
 
           <TabsContent value="csv">
-            <CsvImportPanel selectedAccountId={selectedAccountId}/>
+            <CsvImportPanel selectedAccountId={selectedAccountId} />
           </TabsContent>
         </Tabs>
       )}
