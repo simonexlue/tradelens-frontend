@@ -44,6 +44,7 @@ async function fetchTrades(opts: FetchTradesOpts): Promise<PageResp> {
   opts.filters.sessions.forEach((s) => qs.append("session", s))
   opts.filters.strategies.forEach((s) => qs.append("strategy", s))
   opts.filters.symbols.forEach((s) => qs.append("symbol", s))
+  opts.filters.accounts.forEach((a) => qs.append("account", a))
 
   const r = await fetch(`/api/trades?${qs.toString()}`, { cache: "no-store" })
   if (!r.ok)
@@ -60,15 +61,26 @@ export default function TradesListClient() {
     sessions: [],
     strategies: [],
     symbols: [],
+    accounts: [],
   })
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     outcomes: [],
     sessions: [],
     strategies: [],
     symbols: [],
+    accounts: [],
   })
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Map accountId -> name for display
+  const accountLabelMap = useMemo(() => {
+    const map: Record<string,string> = {}
+    for(const acc of filterOptions.accounts) {
+      map[acc.id] = acc.label
+    }
+    return map
+  }, [filterOptions.accounts])
 
   useEffect(() => {
     // Load available filter options (outcomes/sessions/strategies/symbols)
@@ -85,6 +97,7 @@ export default function TradesListClient() {
           sessions: (data.sessions ?? []) as Session[],
           strategies: (data.strategies ?? []) as string[],
           symbols: (data.symbols ?? []) as string[],
+          accounts: (data.accounts ?? []) as { id: string; label: string }[],
         })
       } catch (e) {
         console.error("Failed to load filter options", e)
@@ -101,7 +114,8 @@ export default function TradesListClient() {
     filters.outcomes.length > 0 ||
     filters.sessions.length > 0 ||
     filters.strategies.length > 0 ||
-    filters.symbols.length > 0
+    filters.symbols.length > 0 ||
+    filters.accounts.length > 0
 
   const activeFilterPills = useMemo(() => {
     const pills: { key: string; label: string; onClick: () => void }[] = []
@@ -158,8 +172,22 @@ export default function TradesListClient() {
       })
     }
 
+    // Accounts
+    for (const accId of filters.accounts) {
+      const label = accountLabelMap[accId] ?? "Account"
+      pills.push({
+        key: `account-${accId}`,
+        label,
+        onClick: () =>
+          setFilters((prev) => ({
+            ...prev,
+            accounts: prev.accounts.filter((x) => x !== accId),
+          })),
+      })
+    }
+
     return pills
-  }, [filters])
+  }, [filters, accountLabelMap])
 
   async function loadMore(initial = false) {
     try {
@@ -198,7 +226,8 @@ export default function TradesListClient() {
       {(filterOptions.outcomes.length > 0 ||
         filterOptions.sessions.length > 0 ||
         filterOptions.strategies.length > 0 ||
-        filterOptions.symbols.length > 0) && (
+        filterOptions.symbols.length > 0 || 
+        filterOptions.accounts.length > 0) && (
         <section className="mb-4">
           {/* Header row */}
           <div className="mb-2 flex items-center justify-between">
@@ -236,6 +265,7 @@ export default function TradesListClient() {
                       sessions: [],
                       strategies: [],
                       symbols: [],
+                      accounts: [],
                     })
                   }
                   className="absolute right-4 top-3 text-xs text-slate-400 hover:text-teal-300"
@@ -245,6 +275,20 @@ export default function TradesListClient() {
               )}
 
               <div className="space-y-3 text-xs">
+                <FilterGroup<string>
+                  title="Account"
+                  options={filterOptions.accounts.map((a) => a.id)}
+                  activeValues={filters.accounts}
+                  labelMap={accountLabelMap}
+                  onToggle={(accId) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      accounts: prev.accounts.includes(accId)
+                        ? prev.accounts.filter((x) => x !== accId)
+                        : [...prev.accounts, accId],
+                    }))
+                  }
+                />
                 <FilterGroup<TradeOutcome>
                   title="Outcome"
                   options={filterOptions.outcomes}

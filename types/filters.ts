@@ -5,6 +5,7 @@ export type FilterState = {
   sessions: Session[];
   strategies: string[];
   symbols: string[];
+  accounts: string[];
 };
 
 export type FetchTradesOpts = {
@@ -18,4 +19,10 @@ export type FilterOptions = {
   sessions: Session[];
   strategies: string[];
   symbols: string[];
+  accounts: AccountFilterOption[];
+}
+
+export type AccountFilterOption = {
+  id: string
+  label: string
 }
