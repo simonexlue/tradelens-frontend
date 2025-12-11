@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Papa from "papaparse"
 import { CsvImportPanel } from "@/components/trades/CsvImportPanel"
+import { AccountSelect } from "@/components/accounts/AccountSelect"
 
 type CreateTradeResponse = {
   tradeId: string
@@ -63,6 +64,8 @@ function NewTradePageInner() {
   const [loadingStrategies, setLoadingStrategies] = useState(true)
 
   const [mode, setMode] = useState<"manual" | "csv">("manual")
+
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
 
   const handleInput = (e: any) => {
     e.target.style.height = "auto"
@@ -169,6 +172,7 @@ function NewTradePageInner() {
       contracts: parsedContracts,
       pnl: parsedPnl,
       symbol: trimmedSymbol || undefined,
+      accountId: selectedAccountId ?? undefined,
     }
 
     const res = await fetch("/api/trades", {
@@ -408,6 +412,14 @@ function NewTradePageInner() {
         <div className="mb-4 rounded-md bg-red-900/40 border border-red-700 p-3 text-red-200 text-sm">
           {error}
         </div>
+      )}
+
+      {/* Only show account selection when creating a new trade */}
+      {!isAddImageMode && (
+        <AccountSelect
+          value={selectedAccountId}
+          onChange={setSelectedAccountId}
+        />
       )}
 
       {isAddImageMode ? (
@@ -749,7 +761,7 @@ function NewTradePageInner() {
           </TabsContent>
 
           <TabsContent value="csv">
-            <CsvImportPanel />
+            <CsvImportPanel selectedAccountId={selectedAccountId}/>
           </TabsContent>
         </Tabs>
       )}

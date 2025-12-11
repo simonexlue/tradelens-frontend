@@ -84,6 +84,7 @@ export type CreateTradePayload = {
   contracts?: number;
   pnl?: number;
   symbol?: string;
+  accountId?: string | null
 };
 
 export type FetchTradesOpts = {

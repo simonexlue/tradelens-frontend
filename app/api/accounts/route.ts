@@ -1,0 +1,92 @@
+import { NextRequest } from "next/server"
+import { cookies } from "next/headers"
+import { getServerSupabase } from "../_lib/supabaseServer"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+const BACKEND = (
+  process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || ""
+).replace(/\/+$/, "")
+
+async function getAccessTokenFromCookies(): Promise<string | undefined> {
+  const store = await cookies()
+
+  return (
+    store.get("sb-access-token")?.value ??
+    store.get("sb-access-token-v2")?.value ??
+    store.get("supabase-auth-token")?.value
+  )
+}
+
+async function getAccessToken(): Promise<string | undefined> {
+  // 1) Try Supabase server client first
+  try {
+    const supabase = await getServerSupabase()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      return session.access_token
+    }
+  } catch (e) {
+    console.error("getServerSupabase().auth.getSession() failed:", e)
+  }
+
+  // 2) Fallback: read directly from cookies
+  return getAccessTokenFromCookies()
+}
+
+// GET /api/accounts  ->  GET {BACKEND}/accounts
+export async function GET(_req: NextRequest) {
+  if (!BACKEND) {
+    return new Response("BACKEND_BASE_URL not set", { status: 500 })
+  }
+
+  const token = await getAccessToken()
+  if (!token) {
+    return new Response("Not authenticated", { status: 401 })
+  }
+
+  const r = await fetch(`${BACKEND}/accounts`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  })
+
+  return new Response(await r.text(), {
+    status: r.status,
+    headers: {
+      "content-type": r.headers.get("content-type") ?? "application/json",
+    },
+  })
+}
+
+// POST /api/accounts  ->  POST {BACKEND}/accounts/
+export async function POST(req: NextRequest) {
+  if (!BACKEND) {
+    return new Response("BACKEND_BASE_URL not set", { status: 500 })
+  }
+
+  const token = await getAccessToken()
+  if (!token) {
+    return new Response("Not authenticated", { status: 401 })
+  }
+
+  const body = await req.text()
+
+  const r = await fetch(`${BACKEND}/accounts/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "content-type": req.headers.get("content-type") ?? "application/json",
+    },
+    body,
+  })
+
+  return new Response(await r.text(), {
+    status: r.status,
+    headers: {
+      "content-type": r.headers.get("content-type") ?? "application/json",
+    },
+  })
+}

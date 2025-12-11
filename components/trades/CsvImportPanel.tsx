@@ -13,7 +13,11 @@ type ImportResult = {
   skippedCount: number
 }
 
-export function CsvImportPanel() {
+type CsvImportPanelProps = {
+  selectedAccountId: string | null
+}
+
+export function CsvImportPanel({selectedAccountId}: CsvImportPanelProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvError, setCsvError] = useState<string | null>(null)
   const [csvInfo, setCsvInfo] = useState<string | null>(null)
@@ -39,7 +43,7 @@ export function CsvImportPanel() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ rows }),
+        body: JSON.stringify({ accountId: selectedAccountId, rows }),
       })
 
       if (!res.ok) {
