@@ -4,5 +4,5 @@ export type DashboardKpis = {
     todayPnl: number
     weekPnl: number
     winRateLast30: number
-    avgPnlLast30: number
+    profitFactor: number | null
 }
