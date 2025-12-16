@@ -103,14 +103,14 @@ export default function LoginPage() {
 
         setStatus({
           type: "ok",
-          msg: `Signed in successfully as ${emailFromSession}.`,
+          msg: `Signed in successfully.`,
         })
 
         console.log("Signed in session:", session)
 
         // 4) Redirect AFTER a short delay so you can see the banner
         setTimeout(() => {
-          router.replace("/trades-list")
+          router.replace("/")
         }, 800)
       }
     } catch (err: any) {
